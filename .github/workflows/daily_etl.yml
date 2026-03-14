@@ -1,0 +1,44 @@
+name: Täglicher ETL-Lauf
+
+on:
+  schedule:
+    # Jeden Tag um 02:00 UTC (= 03:00 oder 04:00 Uhr deutscher Zeit)
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    # Ermöglicht manuellen Start über die GitHub-Oberfläche (zum Testen)
+
+jobs:
+  etl:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Repository auschecken (inkl. urbanscore.db)
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      # 2. Python einrichten
+      - name: Python 3.11 einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 3. Abhängigkeiten installieren
+      - name: Abhängigkeiten installieren
+        run: pip install -r requirements.txt
+
+      # 4. ETL-Pipeline ausführen
+      # API-Keys werden als GitHub Secrets hinterlegt (niemals im Code!)
+      - name: ETL-Pipeline ausführen
+        env:
+          IMMOSCOUT_TOKEN:    ${{ secrets.IMMOSCOUT_TOKEN }}
+          ARBEITSAGENTUR_KEY: ${{ secrets.ARBEITSAGENTUR_KEY }}
+        run: python etl_pipeline.py
+
+      # 5. Aktualisierte Datenbank zurück ins Repository pushen
+      - name: Datenbank committen und pushen
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add urbanscore.db
+          git diff --staged --quiet || git commit -m "ETL: Daten aktualisiert $(date +'%Y-%m-%d')"
+          git push
