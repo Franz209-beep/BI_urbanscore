@@ -91,7 +91,7 @@ def extract_wetter(stadt):
         "timezone":   "Europe/Berlin",
     }
     try:
-        resp = requests.get(url, params=params, timeout=10)
+        resp = requests.get(url, params=params, timeout=30)
         resp.raise_for_status()
         data = resp.json()["daily"]
         df = pd.DataFrame(data)
@@ -384,6 +384,8 @@ def berechne_ranking(conn, zeit_id):
 # ---------------------------------------------------------------
 
 def main():
+    import time
+
     print(f"=== UrbanScore ETL-Pipeline gestartet ({date.today()}) ===")
     conn = get_conn()
     zeit_id = get_oder_erstelle_zeit_id(conn, JAHR)
@@ -408,10 +410,14 @@ def main():
         if arbeitsmarkt:
             load_arbeitsmarkt(conn, stadt_id, zeit_id, arbeitsmarkt)
 
+        # Pause vor Overpass-Abfrage um Rate-Limit zu vermeiden
+        time.sleep(5)
         infra = extract_infrastruktur(stadt)
         if infra:
             load_infrastruktur(conn, stadt_id, zeit_id, infra)
 
+        # Pause zwischen Städten
+        time.sleep(10)
         print()
 
     conn.commit()
