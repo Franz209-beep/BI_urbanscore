@@ -30,10 +30,10 @@ jobs:
       # API-Keys werden als GitHub Secrets hinterlegt (niemals im Code!)
       - name: ETL-Pipeline ausführen
         env:
-          IMMOSCOUT_TOKEN:    ${{ secrets.IMMOSCOUT_TOKEN }}
-          ARBEITSAGENTUR_KEY: ${{ secrets.ARBEITSAGENTUR_KEY }}
+          GENESIS_USERNAME: ${{ secrets.GENESIS_USERNAME }}
+          GENESIS_PASSWORD: ${{ secrets.GENESIS_PASSWORD }}
         run: python etl_pipeline.py
-
+        
       # 5. Aktualisierte Datenbank zurück ins Repository pushen
       - name: Datenbank committen und pushen
         run: |
