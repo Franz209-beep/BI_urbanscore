@@ -1,5 +1,5 @@
 requests
 pandas
 scikit-learn
-streamlit
+streamlit>=1.32.0
 overpass
