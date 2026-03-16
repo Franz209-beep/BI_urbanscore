@@ -237,7 +237,7 @@ if col_name in df_sorted.columns and df_sorted[col_name].notna().any():
         color=alt.Color(f"{col_name}:Q", scale=alt.Scale(scheme="blues"), legend=None),
         tooltip=["name:N", alt.Tooltip(f"{col_name}:Q", title=kat_auswahl, format=".2f")],
     ).properties(height=320).configure_axis(grid=False, labelFontSize=13).configure_view(strokeWidth=0)
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, width='stretch')
 else:
     st.info(f"Keine Daten für '{kat_auswahl}' vorhanden.")
 
@@ -297,7 +297,7 @@ if hat_ranking and all(c in row.index for c in score_cols):
         ), legend=None),
         tooltip=["Kategorie:N", alt.Tooltip("Score:Q", format=".1f")],
     ).properties(height=260, title=f"Teilscores — {stadt_auswahl}").configure_axis(grid=False).configure_view(strokeWidth=0)
-    st.altair_chart(sc, use_container_width=True)
+    st.altair_chart(sc, width='stretch')
 
 # ---------------------------------------------------------------
 # Karte
@@ -329,7 +329,7 @@ if not ranking.empty and not zeit.empty:
             color=alt.Color("name:N", title="Stadt"),
             tooltip=["name:N","jahr:O", alt.Tooltip(f"{metrik_auswahl}:Q", format=".3f")],
         ).properties(height=320).configure_axis(grid=False).configure_view(strokeWidth=0)
-        st.altair_chart(linie, use_container_width=True)
+        st.altair_chart(linie, width='stretch')
     else:
         st.info("Für eine Zeitreihe werden mindestens zwei Jahre Daten benötigt. Die ETL-Pipeline sammelt täglich Daten — im nächsten Jahr wird diese Ansicht automatisch befüllt.")
 else:
