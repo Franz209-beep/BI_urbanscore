@@ -239,7 +239,7 @@ if col_name in df_sorted.columns and df_sorted[col_name].notna().any():
     ).properties(height=320).configure_axis(grid=False, labelFontSize=13).configure_view(strokeWidth=0)
     st.altair_chart(chart, use_container_width=True)
 else:
-    st.info(f"Keine Daten für „{kat_auswahl}" vorhanden.")
+    st.info(f"Keine Daten für '{kat_auswahl}' vorhanden.")
 
 # ---------------------------------------------------------------
 # Detailansicht pro Stadt
