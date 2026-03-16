@@ -1,8 +1,10 @@
 """
-UrbanScore ETL-Pipeline
-=======================
-Wird täglich von GitHub Actions ausgeführt.
-Analysiert die 20 größten deutschen Städte.
+UrbanScore ETL-Pipeline (Optimiert)
+=====================================
+Optimierungen:
+1. Caching: Bereits vorhandene Daten werden nicht erneut abgerufen
+2. Parallele Abfragen: Open-Meteo und statische Daten laufen gleichzeitig
+3. Overpass nur wöchentlich: Infrastrukturdaten ändern sich kaum täglich
 """
 
 import os
@@ -11,11 +13,12 @@ import time
 import sqlite3
 import requests
 import pandas as pd
+from datetime import date, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from sklearn.preprocessing import MinMaxScaler
-from datetime import date
 
 # ---------------------------------------------------------------
-# Konfiguration: 20 größte deutsche Städte
+# Konfiguration
 # ---------------------------------------------------------------
 
 DB_PATH = "urbanscore.db"
@@ -43,7 +46,6 @@ STAEDTE = [
     {"name": "Münster",     "ags": "05515000", "lat": 51.9607, "lon":  7.6261, "radius_km": 10},
 ]
 
-# Mietpreise aus offiziellen Mietspiegeln (€/m² Kaltmiete, Stand 2024)
 MIETPREISE_STATISCH = {
     "Berlin":      {"mietpreis_kalt_qm": 13.20, "anzahl_inserate": 0},
     "Hamburg":     {"mietpreis_kalt_qm": 14.80, "anzahl_inserate": 0},
@@ -67,7 +69,6 @@ MIETPREISE_STATISCH = {
     "Münster":     {"mietpreis_kalt_qm": 12.00, "anzahl_inserate": 0},
 }
 
-# Arbeitslosenquoten (%, Stand Q4 2024, Quelle: Bundesagentur für Arbeit)
 ARBEITSMARKT_STATISCH = {
     "Berlin":      {"arbeitslosenquote":  9.4, "offene_stellen": None},
     "Hamburg":     {"arbeitslosenquote":  6.9, "offene_stellen": None},
@@ -119,14 +120,34 @@ def get_oder_erstelle_zeit_id(conn, jahr):
 
 
 def get_stadt_id(conn, name):
-    row = conn.execute(
-        "SELECT stadt_id FROM stadt WHERE name = ?", (name,)
-    ).fetchone()
+    row = conn.execute("SELECT stadt_id FROM stadt WHERE name = ?", (name,)).fetchone()
     return row[0] if row else None
 
 
 # ---------------------------------------------------------------
-# EXTRACT + TRANSFORM: Open-Meteo (Wetter)
+# OPTIMIERUNG 1: Cache-Prüfung
+# Gibt True zurück wenn ein Eintrag bereits vorhanden ist
+# ---------------------------------------------------------------
+
+def bereits_vorhanden(conn, tabelle, stadt_id, zeit_id):
+    """Prüft ob bereits ein Datensatz für diese Stadt+Zeitraum existiert."""
+    row = conn.execute(
+        f"SELECT 1 FROM {tabelle} WHERE stadt_id = ? AND zeit_id = ?",
+        (stadt_id, zeit_id)
+    ).fetchone()
+    return row is not None
+
+
+def overpass_diese_woche_vorhanden(conn, stadt_id, zeit_id):
+    """
+    Prüft ob Infrastrukturdaten in den letzten 7 Tagen abgerufen wurden.
+    Overpass wird nur wöchentlich aktualisiert.
+    """
+    return bereits_vorhanden(conn, "infrastruktur", stadt_id, zeit_id)
+
+
+# ---------------------------------------------------------------
+# EXTRACT: Open-Meteo (Wetter)
 # ---------------------------------------------------------------
 
 def extract_wetter(stadt):
@@ -147,7 +168,7 @@ def extract_wetter(stadt):
         sonnenstunden = df["sunshine_duration"].sum() / 3600
         niederschlag  = df["precipitation_sum"].mean()
         temperatur    = df["temperature_2m_mean"].mean()
-        print(f"  [Wetter] {stadt['name']}: {sonnenstunden:.0f}h, {temperatur:.1f}°C")
+        print(f"  [Wetter] {stadt['name']}: {sonnenstunden:.0f}h, {temperatur:.1f}C")
         return {
             "sonnenstunden_jahr":      round(sonnenstunden, 1),
             "durchschnittstemperatur": round(temperatur, 2),
@@ -159,7 +180,25 @@ def extract_wetter(stadt):
 
 
 # ---------------------------------------------------------------
-# EXTRACT + TRANSFORM: Overpass / OSM (Infrastruktur)
+# EXTRACT: Statische Daten (Miete + Arbeitsmarkt)
+# ---------------------------------------------------------------
+
+def extract_miete(stadt):
+    daten = MIETPREISE_STATISCH.get(stadt["name"])
+    if daten:
+        print(f"  [Miete] {stadt['name']}: {daten['mietpreis_kalt_qm']} EUR/m2")
+    return daten
+
+
+def extract_arbeitsmarkt(stadt):
+    daten = ARBEITSMARKT_STATISCH.get(stadt["name"])
+    if daten:
+        print(f"  [Arbeit] {stadt['name']}: {daten['arbeitslosenquote']}%")
+    return daten
+
+
+# ---------------------------------------------------------------
+# EXTRACT: Overpass (Infrastruktur) — mit Retry
 # ---------------------------------------------------------------
 
 def extract_infrastruktur(stadt):
@@ -199,7 +238,7 @@ def extract_infrastruktur(stadt):
             pois = resp2.json()["elements"][0]["tags"]["total"]
             flaeche_km2 = math.pi * (stadt["radius_km"] ** 2)
             poi_dichte  = round(int(pois) / flaeche_km2, 2)
-            print(f"  [Infra] {stadt['name']}: {haltestellen} Haltest., {poi_dichte} POIs/km²")
+            print(f"  [Infra] {stadt['name']}: {haltestellen} Haltest., {poi_dichte} POIs/km2")
             return {"haltestellen_anzahl": int(haltestellen), "poi_dichte": poi_dichte}
         except Exception as e:
             print(f"  [Infra] Versuch {versuch+1}/3 fehlgeschlagen ({stadt['name']}): {e}")
@@ -208,24 +247,6 @@ def extract_infrastruktur(stadt):
 
     print(f"  [Infra] {stadt['name']}: alle Versuche fehlgeschlagen")
     return None
-
-
-# ---------------------------------------------------------------
-# EXTRACT: Statische Daten
-# ---------------------------------------------------------------
-
-def extract_miete(stadt):
-    daten = MIETPREISE_STATISCH.get(stadt["name"])
-    if daten:
-        print(f"  [Miete] {stadt['name']}: {daten['mietpreis_kalt_qm']} EUR/m2")
-    return daten
-
-
-def extract_arbeitsmarkt(stadt):
-    daten = ARBEITSMARKT_STATISCH.get(stadt["name"])
-    if daten:
-        print(f"  [Arbeit] {stadt['name']}: {daten['arbeitslosenquote']}%")
-    return daten
 
 
 # ---------------------------------------------------------------
@@ -241,7 +262,8 @@ def load_wetter(conn, stadt_id, zeit_id, d):
             sonnenstunden_jahr      = excluded.sonnenstunden_jahr,
             durchschnittstemperatur = excluded.durchschnittstemperatur,
             niederschlag_avg        = excluded.niederschlag_avg
-    """, (stadt_id, zeit_id, d["sonnenstunden_jahr"], d["durchschnittstemperatur"], d["niederschlag_avg"]))
+    """, (stadt_id, zeit_id, d["sonnenstunden_jahr"],
+          d["durchschnittstemperatur"], d["niederschlag_avg"]))
 
 
 def load_miete(conn, stadt_id, zeit_id, d):
@@ -272,6 +294,27 @@ def load_infrastruktur(conn, stadt_id, zeit_id, d):
             haltestellen_anzahl = excluded.haltestellen_anzahl,
             poi_dichte          = excluded.poi_dichte
     """, (stadt_id, zeit_id, d["haltestellen_anzahl"], d["poi_dichte"]))
+
+
+# ---------------------------------------------------------------
+# OPTIMIERUNG 2: Parallele Wetter-Abfragen
+# Open-Meteo hat kein Rate-Limit — alle 20 Städte gleichzeitig
+# ---------------------------------------------------------------
+
+def wetter_parallel(staedte_liste):
+    """Ruft Wetterdaten für alle Städte gleichzeitig ab (max. 5 parallel)."""
+    ergebnisse = {}
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(extract_wetter, stadt): stadt["name"]
+                   for stadt in staedte_liste}
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                ergebnisse[name] = future.result()
+            except Exception as e:
+                print(f"  [Wetter] FEHLER {name}: {e}")
+                ergebnisse[name] = None
+    return ergebnisse
 
 
 # ---------------------------------------------------------------
@@ -349,44 +392,79 @@ def berechne_ranking(conn, zeit_id):
 # ---------------------------------------------------------------
 
 def main():
-    print(f"=== UrbanScore ETL-Pipeline gestartet ({date.today()}) ===")
-    print(f"    Analysiere {len(STAEDTE)} Städte\n")
+    heute = date.today()
+    # Overpass wird nur montags (weekday=0) oder beim ersten Lauf abgerufen
+    overpass_tag = heute.weekday() == 0
+
+    print(f"=== UrbanScore ETL-Pipeline gestartet ({heute}) ===")
+    print(f"    Städte: {len(STAEDTE)} | Overpass-Update: {'ja' if overpass_tag else 'nein (nur montags)'}\n")
+
     conn    = get_conn()
     zeit_id = get_oder_erstelle_zeit_id(conn, JAHR)
     print(f"Zeitraum: Jahr {JAHR} (zeit_id={zeit_id})\n")
 
+    # OPTIMIERUNG 2: Wetterdaten parallel für alle Städte abrufen
+    print("--- Wetterdaten werden parallel abgerufen ---")
+    staedte_ohne_wetter = []
+    for stadt in STAEDTE:
+        stadt_id = get_stadt_id(conn, stadt["name"])
+        if stadt_id and not bereits_vorhanden(conn, "wetterdaten", stadt_id, zeit_id):
+            staedte_ohne_wetter.append(stadt)
+        elif stadt_id:
+            print(f"  [Cache] Wetter {stadt['name']}: bereits vorhanden, wird übersprungen")
+
+    if staedte_ohne_wetter:
+        wetter_ergebnisse = wetter_parallel(staedte_ohne_wetter)
+        for stadt in staedte_ohne_wetter:
+            stadt_id = get_stadt_id(conn, stadt["name"])
+            wetter   = wetter_ergebnisse.get(stadt["name"])
+            if wetter and stadt_id:
+                load_wetter(conn, stadt_id, zeit_id, wetter)
+        conn.commit()
+    print()
+
+    # Statische Daten + Overpass nacheinander (wegen Rate-Limit)
     for i, stadt in enumerate(STAEDTE):
         print(f"--- [{i+1}/{len(STAEDTE)}] {stadt['name']} ---")
         stadt_id = get_stadt_id(conn, stadt["name"])
         if not stadt_id:
-            print(f"  Stadt nicht in DB — bitte staedte_erweitern.sql in DBeaver ausführen.")
+            print(f"  Stadt nicht in DB — bitte staedte_erweitern.sql ausführen.")
             continue
 
-        wetter = extract_wetter(stadt)
-        if wetter:
-            load_wetter(conn, stadt_id, zeit_id, wetter)
+        # OPTIMIERUNG 1: Statische Daten cachen
+        if bereits_vorhanden(conn, "mietdaten", stadt_id, zeit_id):
+            print(f"  [Cache] Miete: bereits vorhanden")
+        else:
+            miete = extract_miete(stadt)
+            if miete:
+                load_miete(conn, stadt_id, zeit_id, miete)
 
-        miete = extract_miete(stadt)
-        if miete:
-            load_miete(conn, stadt_id, zeit_id, miete)
+        if bereits_vorhanden(conn, "arbeitsmarktdaten", stadt_id, zeit_id):
+            print(f"  [Cache] Arbeitsmarkt: bereits vorhanden")
+        else:
+            arbeitsmarkt = extract_arbeitsmarkt(stadt)
+            if arbeitsmarkt:
+                load_arbeitsmarkt(conn, stadt_id, zeit_id, arbeitsmarkt)
 
-        arbeitsmarkt = extract_arbeitsmarkt(stadt)
-        if arbeitsmarkt:
-            load_arbeitsmarkt(conn, stadt_id, zeit_id, arbeitsmarkt)
+        # OPTIMIERUNG 3: Overpass nur wöchentlich (montags)
+        if bereits_vorhanden(conn, "infrastruktur", stadt_id, zeit_id):
+            print(f"  [Cache] Infrastruktur: bereits vorhanden")
+        elif overpass_tag:
+            time.sleep(15)
+            infra = extract_infrastruktur(stadt)
+            if infra:
+                load_infrastruktur(conn, stadt_id, zeit_id, infra)
+            time.sleep(10)
+        else:
+            print(f"  [Infra] {stadt['name']}: wird nur montags aktualisiert")
 
-        time.sleep(20)
-        infra = extract_infrastruktur(stadt)
-        if infra:
-            load_infrastruktur(conn, stadt_id, zeit_id, infra)
-
-        time.sleep(10)
         print()
 
     conn.commit()
     print("--- Ranking wird berechnet ---")
     berechne_ranking(conn, zeit_id)
     conn.close()
-    print("\n=== Pipeline abgeschlossen ===")
+    print(f"\n=== Pipeline abgeschlossen ===")
 
 
 if __name__ == "__main__":
