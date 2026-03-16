@@ -269,7 +269,7 @@ rang_v  = f"#{int(row['rang'])}"                  if pd.notna(row.get("rang"))  
 score_v = f"{int(float(row['gesamtscore'])*100)}%" if pd.notna(row.get("gesamtscore"))            else "—"
 
 d1, d2, d3, d4 = st.columns(4)
-detail_karte(d1, "Gesamtrang",    rang_v,  "von 5 Städten",         "#0f3460")
+detail_karte(d1, "Gesamtrang",    rang_v,  "von 20 Städten",        "#0f3460")
 detail_karte(d2, "Gesamtscore",   score_v, "gewichteter Wert",      "#e94560")
 detail_karte(d3, "Sonnenstunden", sonne_v, "h/Jahr",                "#f6ad55")
 detail_karte(d4, "Temperatur",    temp_v,  "°C Jahresdurchschnitt", "#68d391")
