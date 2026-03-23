@@ -206,24 +206,6 @@ stat_card(s3, "APIs aktiv", f"{apis_aktiv} / 4")
 best_sonne = df.loc[df["sonnenstunden_jahr"].idxmax(), "name"] if hat_wetter and "sonnenstunden_jahr" in df.columns and df["sonnenstunden_jahr"].notna().any() else "—"
 stat_card(s4, "Meiste Sonne", best_sonne)
 
-# ---------------------------------------------------------------
-# API-Status
-# ---------------------------------------------------------------
-
-st.markdown("<div style='margin-top:1rem'></div>", unsafe_allow_html=True)
-api_html = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:0.5rem">'
-for api_name, aktiv in [
-    ("Open-Meteo (Klima)",          hat_wetter),
-    ("Mietspiegel (Wohnen)",         hat_miete),
-    ("Arbeitsagentur (Wirtschaft)",  hat_arbeit),
-    ("Overpass/OSM (Infrastruktur)", hat_infra),
-]:
-    farbe  = "#c6f6d5" if aktiv else "#fed7d7"
-    txt    = "#276749" if aktiv else "#9b2c2c"
-    status = "aktiv"   if aktiv else "ausstehend"
-    api_html += f'<div style="background:{farbe};color:{txt};font-size:0.72rem;padding:4px 12px;border-radius:999px;font-weight:500">{api_name} · {status}</div>'
-api_html += '</div>'
-st.markdown(api_html, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------
 # Siegerpodest mit Medaillen
@@ -427,6 +409,25 @@ if not ranking.empty and not zeit.empty:
             tooltip=["name:N","jahr:O", alt.Tooltip(f"{metrik}:Q", format=".3f")],
         ).properties(height=280).configure_axis(grid=False).configure_view(strokeWidth=0)
         st.altair_chart(linie, width='stretch')
+
+# ---------------------------------------------------------------
+# API-Status
+# ---------------------------------------------------------------
+
+st.markdown("<div style='margin-top:1rem'></div>", unsafe_allow_html=True)
+api_html = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:0.5rem">'
+for api_name, aktiv in [
+    ("Open-Meteo (Klima)",          hat_wetter),
+    ("Mietspiegel (Wohnen)",         hat_miete),
+    ("Arbeitsagentur (Wirtschaft)",  hat_arbeit),
+    ("Overpass/OSM (Infrastruktur)", hat_infra),
+]:
+    farbe  = "#c6f6d5" if aktiv else "#fed7d7"
+    txt    = "#276749" if aktiv else "#9b2c2c"
+    status = "aktiv"   if aktiv else "ausstehend"
+    api_html += f'<div style="background:{farbe};color:{txt};font-size:0.72rem;padding:4px 12px;border-radius:999px;font-weight:500">{api_name} · {status}</div>'
+api_html += '</div>'
+st.markdown(api_html, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------
 # Footer
