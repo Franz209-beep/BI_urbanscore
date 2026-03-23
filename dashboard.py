@@ -6,6 +6,8 @@ mit farbigen Teilscores, Detailansicht und Vergleichsdiagramm.
 """
 
 import sqlite3
+import os
+import datetime
 import pandas as pd
 import streamlit as st
 import altair as alt
@@ -46,75 +48,22 @@ html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
 .stat-value { font-family: 'DM Serif Display', serif; font-size: 1.6rem; color: #0f1923; }
 
 .podest-wrap { display: flex; align-items: flex-end; gap: 12px; margin: 1.5rem 0; }
-
-.podest-card {
-    flex: 1;
-    background: white;
-    border: 0.5px solid #e2e8f0;
-    border-radius: 14px;
-    padding: 1.2rem;
-    text-align: center;
-}
+.podest-card { flex: 1; background: white; border: 0.5px solid #e2e8f0; border-radius: 14px; padding: 1.2rem; text-align: center; }
 .podest-card.gold { border: 2px solid #f6ad55; }
-
-.podest-rank-circle {
-    width: 42px; height: 42px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    margin: 0 auto 10px;
-    font-family: 'DM Serif Display', serif;
-    font-size: 1.2rem;
-}
-.podest-rank-circle.gold   { background: #fef3e2; color: #c47d0e; width:52px; height:52px; font-size:1.5rem; }
-.podest-rank-circle.silver { background: #f1f0ec; color: #6b6b6b; }
-.podest-rank-circle.bronze { background: #fdf0e8; color: #9b5a2d; }
-
 .podest-city { font-size: 1rem; font-weight: 500; color: #0f1923; }
 .podest-city.gold { font-size: 1.2rem; }
 .podest-state { font-size: 0.75rem; color: #9aabba; margin-top: 2px; }
 .podest-score { font-size: 0.85rem; color: #5a7a96; margin-top: 6px; }
 
-.section-label {
-    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1.5px;
-    color: #9aabba; margin: 1.5rem 0 0.8rem 0;
-}
-
-.rank-table { width: 100%; border-collapse: collapse; }
-.rank-table th {
-    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px;
-    color: #9aabba; font-weight: 400; padding: 0 8px 8px;
-    border-bottom: 0.5px solid #e8ecf0; text-align: left;
-}
-.rank-table th.right { text-align: right; }
-.rank-table td { padding: 9px 8px; border-bottom: 0.5px solid #f3f5f7; font-size: 0.88rem; vertical-align: middle; }
-.rank-table tr:last-child td { border-bottom: none; }
-.rank-table tr:hover td { background: #f9fbfc; }
-
-.rank-num { color: #c0cdd8; font-size: 0.8rem; width: 28px; }
-.rank-city-name { font-weight: 500; color: #0f1923; }
-.rank-state-tag { font-size: 0.72rem; color: #b0bec8; margin-left: 5px; }
-.rank-score-val { text-align: right; font-weight: 500; color: #0f1923; }
-
-.mini-bar-wrap { display: flex; gap: 3px; align-items: center; }
-.mini-bar {
-    height: 14px; border-radius: 3px; min-width: 3px;
-    display: inline-block;
-}
+.section-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1.5px; color: #9aabba; margin: 1.5rem 0 0.8rem 0; }
 
 .detail-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
-.detail-kachel {
-    background: #f7f8fa; border-radius: 10px;
-    padding: 12px 14px; text-align: center;
-    border-top: 3px solid transparent;
-}
+.detail-kachel { background: #f7f8fa; border-radius: 10px; padding: 12px 14px; text-align: center; border-top: 3px solid transparent; }
 .detail-kachel-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px; color: #9aabba; margin-bottom: 6px; }
 .detail-kachel-val { font-family: 'DM Serif Display', serif; font-size: 1.5rem; color: #0f1923; }
 .detail-kachel-unit { font-size: 0.72rem; color: #b0bec8; margin-top: 2px; }
 
-.info-pill {
-    display: inline-block; font-size: 0.7rem; padding: 3px 10px;
-    border-radius: 999px; margin-bottom: 1rem;
-    background: #ebf8ff; color: #2c5282;
-}
+.info-pill { display: inline-block; font-size: 0.7rem; padding: 3px 10px; border-radius: 999px; margin-bottom: 1rem; background: #ebf8ff; color: #2c5282; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -144,13 +93,51 @@ if staedte is None:
     st.stop()
 
 # ---------------------------------------------------------------
-# Header
+# Header mit Stadtsilhouette und letztem Update-Datum
 # ---------------------------------------------------------------
 
-st.markdown("""
+letzter_lauf = "—"
+try:
+    ts = os.path.getmtime("urbanscore.db")
+    letzter_lauf = datetime.datetime.fromtimestamp(ts).strftime("%d.%m.%Y")
+except:
+    pass
+
+st.markdown(f"""
 <div class="header">
-    <h1>UrbanScore Deutschland</h1>
-    <p>Multidimensionales Städteranking · Klima, Wohnen, Wirtschaft, Infrastruktur</p>
+  <svg class="skyline" width="420" height="120" viewBox="0 0 420 120" xmlns="http://www.w3.org/2000/svg">
+    <rect x="10"  y="60" width="18" height="60" fill="white"/>
+    <rect x="14"  y="50" width="10" height="12" fill="white"/>
+    <rect x="16"  y="40" width="6"  height="12" fill="white"/>
+    <rect x="35"  y="40" width="22" height="80" fill="white"/>
+    <rect x="41"  y="30" width="10" height="12" fill="white"/>
+    <rect x="63"  y="70" width="14" height="50" fill="white"/>
+    <rect x="83"  y="30" width="26" height="90" fill="white"/>
+    <rect x="87"  y="20" width="8"  height="12" fill="white"/>
+    <rect x="91"  y="10" width="2"  height="12" fill="white"/>
+    <rect x="115" y="55" width="20" height="65" fill="white"/>
+    <rect x="121" y="45" width="8"  height="12" fill="white"/>
+    <rect x="141" y="45" width="30" height="75" fill="white"/>
+    <rect x="148" y="35" width="16" height="12" fill="white"/>
+    <rect x="153" y="25" width="6"  height="12" fill="white"/>
+    <rect x="177" y="65" width="16" height="55" fill="white"/>
+    <rect x="199" y="35" width="24" height="85" fill="white"/>
+    <rect x="205" y="25" width="12" height="12" fill="white"/>
+    <rect x="229" y="50" width="18" height="70" fill="white"/>
+    <rect x="253" y="40" width="28" height="80" fill="white"/>
+    <rect x="259" y="28" width="16" height="14" fill="white"/>
+    <rect x="264" y="18" width="6"  height="12" fill="white"/>
+    <rect x="287" y="60" width="16" height="60" fill="white"/>
+    <rect x="309" y="38" width="22" height="82" fill="white"/>
+    <rect x="314" y="26" width="12" height="14" fill="white"/>
+    <rect x="337" y="55" width="18" height="65" fill="white"/>
+    <rect x="361" y="42" width="26" height="78" fill="white"/>
+    <rect x="367" y="30" width="14" height="14" fill="white"/>
+    <rect x="393" y="62" width="20" height="58" fill="white"/>
+    <rect x="0"   y="118" width="420" height="4" fill="white"/>
+  </svg>
+  <h1>UrbanScore Deutschland</h1>
+  <p>Multidimensionales Städteranking · Klima, Wohnen, Wirtschaft, Infrastruktur · Letzte Aktualisierung: {letzter_lauf}</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -220,7 +207,26 @@ best_sonne = df.loc[df["sonnenstunden_jahr"].idxmax(), "name"] if hat_wetter and
 stat_card(s4, "Meiste Sonne", best_sonne)
 
 # ---------------------------------------------------------------
-# Siegerpodest (Top 3)
+# API-Status
+# ---------------------------------------------------------------
+
+st.markdown("<div style='margin-top:1rem'></div>", unsafe_allow_html=True)
+api_html = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:0.5rem">'
+for api_name, aktiv in [
+    ("Open-Meteo (Klima)",          hat_wetter),
+    ("Mietspiegel (Wohnen)",         hat_miete),
+    ("Arbeitsagentur (Wirtschaft)",  hat_arbeit),
+    ("Overpass/OSM (Infrastruktur)", hat_infra),
+]:
+    farbe  = "#c6f6d5" if aktiv else "#fed7d7"
+    txt    = "#276749" if aktiv else "#9b2c2c"
+    status = "aktiv"   if aktiv else "ausstehend"
+    api_html += f'<div style="background:{farbe};color:{txt};font-size:0.72rem;padding:4px 12px;border-radius:999px;font-weight:500">{api_name} · {status}</div>'
+api_html += '</div>'
+st.markdown(api_html, unsafe_allow_html=True)
+
+# ---------------------------------------------------------------
+# Siegerpodest mit Medaillen
 # ---------------------------------------------------------------
 
 st.markdown('<div class="section-label">Siegerpodest</div>', unsafe_allow_html=True)
@@ -234,31 +240,28 @@ def podest_score(row):
 if len(top3) >= 3:
     pod_html = '<div class="podest-wrap">'
 
-    # Platz 2 — links, etwas tiefer
     r2 = top3.iloc[1]
     pod_html += f"""
-    <div class="podest-card" style="margin-bottom: 0px; margin-top: 40px;">
-        <div class="podest-rank-circle silver">2</div>
+    <div class="podest-card" style="margin-top: 40px;">
+        <div style="font-size:32px;margin-bottom:6px">&#x1F948;</div>
         <div class="podest-city">{r2['name']}</div>
         <div class="podest-state">{r2['bundesland']}</div>
         <div class="podest-score">{podest_score(r2)}</div>
     </div>"""
 
-    # Platz 1 — Mitte, oben
     r1 = top3.iloc[0]
     pod_html += f"""
     <div class="podest-card gold" style="margin-top: 0px;">
-        <div class="podest-rank-circle gold">1</div>
+        <div style="font-size:40px;margin-bottom:6px">&#x1F947;</div>
         <div class="podest-city gold">{r1['name']}</div>
         <div class="podest-state">{r1['bundesland']}</div>
         <div class="podest-score">{podest_score(r1)}</div>
     </div>"""
 
-    # Platz 3 — rechts, noch tiefer
     r3 = top3.iloc[2]
     pod_html += f"""
     <div class="podest-card" style="margin-top: 60px;">
-        <div class="podest-rank-circle bronze">3</div>
+        <div style="font-size:28px;margin-bottom:6px">&#x1F949;</div>
         <div class="podest-city">{r3['name']}</div>
         <div class="podest-state">{r3['bundesland']}</div>
         <div class="podest-score">{podest_score(r3)}</div>
@@ -268,8 +271,9 @@ if len(top3) >= 3:
     st.markdown(pod_html, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------
-# Ranking-Tabelle
+# Ranking-Tabelle (2 Spalten)
 # ---------------------------------------------------------------
+
 st.markdown('<div class="section-label">Gesamtranking</div>', unsafe_allow_html=True)
 
 FARBEN = {
@@ -340,18 +344,18 @@ def val(r, col, fmt="{:.1f}", fallback="—"):
     v = r.get(col)
     return fmt.format(float(v)) if pd.notna(v) else fallback
 
-rang_v  = f"#{int(row['rang'])}"   if pd.notna(row.get("rang"))          else "—"
+rang_v  = f"#{int(row['rang'])}" if pd.notna(row.get("rang")) else "—"
 score_v = f"{int(float(row['gesamtscore'])*100)}%" if pd.notna(row.get("gesamtscore")) else "—"
 
 detail = '<div class="detail-grid">'
-detail += kachel("Rang",          rang_v,                        f"von {len(staedte)} Städten", "#0f3460")
-detail += kachel("Gesamtscore",   score_v,                       "gewichtet",                   "#e94560")
-detail += kachel("Sonnenstunden", val(row,"sonnenstunden_jahr","{:.0f}"), "h / Jahr",            "#5DCAA5")
-detail += kachel("Temperatur",    val(row,"durchschnittstemperatur"),     "°C",                  "#5DCAA5")
-detail += kachel("Kaltmiete",     val(row,"mietpreis_kalt_qm","{:.2f}"), "€/m²",                "#378ADD")
-detail += kachel("Arbeitslosigkeit", val(row,"arbeitslosenquote"),        "%",                   "#EF9F27")
-detail += kachel("Haltestellen",  val(row,"haltestellen_anzahl","{:.0f}"), "im Stadtgebiet",     "#D85A30")
-detail += kachel("POI-Dichte",    val(row,"poi_dichte"),                  "POIs/km²",            "#D85A30")
+detail += kachel("Rang",             rang_v,                                f"von {len(staedte)} Städten", "#0f3460")
+detail += kachel("Gesamtscore",      score_v,                               "gewichtet",                   "#e94560")
+detail += kachel("Sonnenstunden",    val(row,"sonnenstunden_jahr","{:.0f}"),  "h / Jahr",                   "#5DCAA5")
+detail += kachel("Temperatur",       val(row,"durchschnittstemperatur"),      "°C",                         "#5DCAA5")
+detail += kachel("Kaltmiete",        val(row,"mietpreis_kalt_qm","{:.2f}"),  "€/m²",                       "#378ADD")
+detail += kachel("Arbeitslosigkeit", val(row,"arbeitslosenquote"),            "%",                          "#EF9F27")
+detail += kachel("Haltestellen",     val(row,"haltestellen_anzahl","{:.0f}"), "im Stadtgebiet",             "#D85A30")
+detail += kachel("POI-Dichte",       val(row,"poi_dichte"),                   "POIs/km²",                   "#D85A30")
 detail += '</div>'
 st.markdown(detail, unsafe_allow_html=True)
 
@@ -362,14 +366,14 @@ st.markdown(detail, unsafe_allow_html=True)
 st.markdown('<div class="section-label">Städtevergleich</div>', unsafe_allow_html=True)
 
 kategorien = {
-    "Gesamtscore":       ("gesamtscore",        False, "#378ADD"),
-    "Klima":             ("score_klima",         False, "#5DCAA5"),
-    "Wohnen":            ("score_wohnen",        False, "#378ADD"),
-    "Wirtschaft":        ("score_wirtschaft",    False, "#EF9F27"),
-    "Infrastruktur":     ("score_infrastruktur", False, "#D85A30"),
-    "Sonnenstunden (h)": ("sonnenstunden_jahr",  False, "#5DCAA5"),
-    "Mietpreis (€/m²)":  ("mietpreis_kalt_qm",  True,  "#378ADD"),
-    "Arbeitslosigkeit (%)":("arbeitslosenquote", True,  "#EF9F27"),
+    "Gesamtscore":          ("gesamtscore",        False, "#378ADD"),
+    "Klima":                ("score_klima",         False, "#5DCAA5"),
+    "Wohnen":               ("score_wohnen",        False, "#378ADD"),
+    "Wirtschaft":           ("score_wirtschaft",    False, "#EF9F27"),
+    "Infrastruktur":        ("score_infrastruktur", False, "#D85A30"),
+    "Sonnenstunden (h)":    ("sonnenstunden_jahr",  False, "#5DCAA5"),
+    "Mietpreis (Euro/m2)":  ("mietpreis_kalt_qm",  True,  "#378ADD"),
+    "Arbeitslosigkeit (%)": ("arbeitslosenquote",   True,  "#EF9F27"),
 }
 
 kat = st.selectbox("Kennzahl", list(kategorien.keys()), label_visibility="collapsed")
@@ -377,8 +381,6 @@ col_name, invertiert, farbe = kategorien[kat]
 
 if col_name in df_sorted.columns and df_sorted[col_name].notna().any():
     df_bar = df_sorted[["name", col_name]].dropna().sort_values(col_name, ascending=invertiert)
-    df_bar["label"] = df_bar[col_name].apply(lambda x: f"{round(float(x)*100)}%" if col_name.startswith("score") else f"{round(float(x), 1)}")
-
     chart = alt.Chart(df_bar).mark_bar(
         cornerRadiusTopLeft=4, cornerRadiusTopRight=4, color=farbe
     ).encode(
@@ -392,13 +394,12 @@ if col_name in df_sorted.columns and df_sorted[col_name].notna().any():
     ).properties(height=280).configure_axis(
         grid=False, labelFontSize=12
     ).configure_view(strokeWidth=0)
-
     st.altair_chart(chart, width='stretch')
 else:
-    st.info(f"Keine Daten für '{kat}' vorhanden.")
+    st.info(f"Keine Daten fuer '{kat}' vorhanden.")
 
 # ---------------------------------------------------------------
-# Karte + Zeitreihe
+# Karte
 # ---------------------------------------------------------------
 
 st.markdown('<div class="section-label">Karte</div>', unsafe_allow_html=True)
@@ -406,6 +407,10 @@ karte_df = df_sorted[["name","latitude","longitude","gesamtscore"]].copy()
 karte_df = karte_df.rename(columns={"latitude":"lat","longitude":"lon"})
 karte_df["gesamtscore"] = karte_df["gesamtscore"].fillna(0)
 st.map(karte_df, latitude="lat", longitude="lon", size=40000, zoom=5)
+
+# ---------------------------------------------------------------
+# Zeitreihe
+# ---------------------------------------------------------------
 
 if not ranking.empty and not zeit.empty:
     zr = ranking.merge(staedte[["stadt_id","name"]], on="stadt_id")
@@ -422,26 +427,6 @@ if not ranking.empty and not zeit.empty:
             tooltip=["name:N","jahr:O", alt.Tooltip(f"{metrik}:Q", format=".3f")],
         ).properties(height=280).configure_axis(grid=False).configure_view(strokeWidth=0)
         st.altair_chart(linie, width='stretch')
-
-# ---------------------------------------------------------------
-# API status
-# ---------------------------------------------------------------
-
-st.markdown("<div style='margin-top:1rem'></div>", unsafe_allow_html=True)
-
-api_html = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:0.5rem">'
-for api_name, aktiv in [
-    ("Open-Meteo (Klima)",          hat_wetter),
-    ("Mietspiegel (Wohnen)",         hat_miete),
-    ("Arbeitsagentur (Wirtschaft)",  hat_arbeit),
-    ("Overpass/OSM (Infrastruktur)", hat_infra),
-]:
-    farbe   = "#c6f6d5" if aktiv else "#fed7d7"
-    txt     = "#276749" if aktiv else "#9b2c2c"
-    status  = "aktiv" if aktiv else "ausstehend"
-    api_html += f'<div style="background:{farbe};color:{txt};font-size:0.72rem;padding:4px 12px;border-radius:999px;font-weight:500">{api_name} · {status}</div>'
-api_html += '</div>'
-st.markdown(api_html, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------
 # Footer
