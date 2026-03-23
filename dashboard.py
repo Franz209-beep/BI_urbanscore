@@ -265,7 +265,6 @@ if len(top3) >= 3:
 # ---------------------------------------------------------------
 # Ranking-Tabelle
 # ---------------------------------------------------------------
-
 st.markdown('<div class="section-label">Gesamtranking</div>', unsafe_allow_html=True)
 
 FARBEN = {
@@ -275,47 +274,41 @@ FARBEN = {
     "score_infrastruktur": "#D85A30",
 }
 
-def mini_bars(row):
-    html = '<div class="mini-bar-wrap">'
-    for col, farbe in FARBEN.items():
-        val = row.get(col)
-        w = max(3, int(float(val) * 40)) if pd.notna(val) else 3
-        html += f'<div class="mini-bar" style="width:{w}px;background:{farbe};opacity:0.85"></div>'
-    html += '</div>'
-    return html
-
-tabelle_html = """
-<table class="rank-table">
-<thead><tr>
-    <th>#</th>
-    <th>Stadt</th>
-    <th>Teilscores</th>
-    <th class="right">Score</th>
-</tr></thead><tbody>
-"""
-
-for _, row in df_sorted.iterrows():
+def ranking_zeile(row):
     rang  = int(row.get("rang", 0)) if pd.notna(row.get("rang")) else "—"
     score = row.get("gesamtscore")
     score_txt = f"{int(float(score)*100)}%" if pd.notna(score) else "—"
-    bars  = mini_bars(row)
-    tabelle_html += f"""
-    <tr>
-        <td class="rank-num">{rang}</td>
-        <td><span class="rank-city-name">{row['name']}</span><span class="rank-state-tag">{row['bundesland'][:2].upper()}</span></td>
-        <td>{bars}</td>
-        <td class="rank-score-val">{score_txt}</td>
-    </tr>"""
+    bars = ""
+    for col, farbe in FARBEN.items():
+        val = row.get(col)
+        w = max(3, int(float(val) * 40)) if pd.notna(val) else 3
+        bars += f'<div style="width:{w}px;height:14px;border-radius:3px;background:{farbe};opacity:0.85;display:inline-block;margin-right:3px"></div>'
+    return f"""
+    <div style="display:flex;align-items:center;padding:8px 10px;border-bottom:0.5px solid #f3f5f7;font-size:0.88rem;">
+        <div style="width:28px;color:#c0cdd8;font-size:0.8rem">{rang}</div>
+        <div style="flex:1;font-weight:500;color:#0f1923">{row['name']} <span style="font-size:0.72rem;color:#b0bec8">{row['bundesland'][:2].upper()}</span></div>
+        <div style="display:flex;align-items:center;gap:3px;margin-right:12px">{bars}</div>
+        <div style="font-weight:500;color:#0f1923;width:36px;text-align:right">{score_txt}</div>
+    </div>"""
 
-tabelle_html += "</tbody></table>"
-st.markdown(tabelle_html, unsafe_allow_html=True)
+col_links, col_rechts = st.columns(2)
 
-# Legende
-leg_html = '<div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;">'
-for label, farbe in [("Klima","#5DCAA5"),("Wohnen","#378ADD"),("Wirtschaft","#EF9F27"),("Infrastruktur","#D85A30")]:
-    leg_html += f'<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#9aabba"><span style="width:10px;height:10px;border-radius:2px;background:{farbe};display:inline-block"></span>{label}</span>'
-leg_html += '</div>'
-st.markdown(leg_html, unsafe_allow_html=True)
+with col_links:
+    for _, row in df_sorted.iloc[:10].iterrows():
+        st.markdown(ranking_zeile(row), unsafe_allow_html=True)
+
+with col_rechts:
+    for _, row in df_sorted.iloc[10:].iterrows():
+        st.markdown(ranking_zeile(row), unsafe_allow_html=True)
+
+st.markdown("""
+<div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;">
+    <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#9aabba"><span style="width:10px;height:10px;border-radius:2px;background:#5DCAA5;display:inline-block"></span>Klima</span>
+    <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#9aabba"><span style="width:10px;height:10px;border-radius:2px;background:#378ADD;display:inline-block"></span>Wohnen</span>
+    <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#9aabba"><span style="width:10px;height:10px;border-radius:2px;background:#EF9F27;display:inline-block"></span>Wirtschaft</span>
+    <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#9aabba"><span style="width:10px;height:10px;border-radius:2px;background:#D85A30;display:inline-block"></span>Infrastruktur</span>
+</div>
+""", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------
 # Detailansicht
@@ -419,6 +412,26 @@ if not ranking.empty and not zeit.empty:
             tooltip=["name:N","jahr:O", alt.Tooltip(f"{metrik}:Q", format=".3f")],
         ).properties(height=280).configure_axis(grid=False).configure_view(strokeWidth=0)
         st.altair_chart(linie, width='stretch')
+
+# ---------------------------------------------------------------
+# API status
+# ---------------------------------------------------------------
+
+st.markdown("<div style='margin-top:1rem'></div>", unsafe_allow_html=True)
+
+api_html = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:0.5rem">'
+for api_name, aktiv in [
+    ("Open-Meteo (Klima)",          hat_wetter),
+    ("Mietspiegel (Wohnen)",         hat_miete),
+    ("Arbeitsagentur (Wirtschaft)",  hat_arbeit),
+    ("Overpass/OSM (Infrastruktur)", hat_infra),
+]:
+    farbe   = "#c6f6d5" if aktiv else "#fed7d7"
+    txt     = "#276749" if aktiv else "#9b2c2c"
+    status  = "aktiv" if aktiv else "ausstehend"
+    api_html += f'<div style="background:{farbe};color:{txt};font-size:0.72rem;padding:4px 12px;border-radius:999px;font-weight:500">{api_name} · {status}</div>'
+api_html += '</div>'
+st.markdown(api_html, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------
 # Footer
