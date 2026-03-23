@@ -27,14 +27,19 @@ html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
     border-radius: 16px;
     padding: 2rem 2.5rem 1.8rem;
     margin-bottom: 1.5rem;
+    overflow: hidden;
+    position: relative;
 }
 .header h1 {
     font-family: 'DM Serif Display', serif;
     font-size: 2.4rem;
     color: white;
     margin: 0 0 0.3rem 0;
+    position: relative;
+    z-index: 2;
 }
-.header p { color: #7a9ab5; font-size: 0.95rem; margin: 0; font-weight: 300; }
+.header p { color: #7a9ab5; font-size: 0.95rem; margin: 0; font-weight: 300; position: relative; z-index: 2; }
+.skyline { position: absolute; bottom: 0; right: 0; opacity: 0.12; z-index: 1; }
 
 .stat { background: #f7f8fa; border-radius: 10px; padding: 1rem 1.2rem; text-align: center; }
 .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1.2px; color: #8a9ab0; margin-bottom: 5px; }
@@ -274,41 +279,46 @@ FARBEN = {
     "score_infrastruktur": "#D85A30",
 }
 
+BL = {"Nordrhein-Westfalen":"NW","Bayern":"BY","Baden-Württemberg":"BW",
+      "Sachsen":"SN","Berlin":"BE","Hamburg":"HH","Bremen":"HB","Hessen":"HE",
+      "Niedersachsen":"NI","Brandenburg":"BB","Thüringen":"TH",
+      "Sachsen-Anhalt":"ST","Rheinland-Pfalz":"RP","Saarland":"SL",
+      "Schleswig-Holstein":"SH","Mecklenburg-Vorpommern":"MV"}
+
 def ranking_zeile(row):
     rang  = int(row.get("rang", 0)) if pd.notna(row.get("rang")) else "—"
     score = row.get("gesamtscore")
     score_txt = f"{int(float(score)*100)}%" if pd.notna(score) else "—"
     bars = ""
     for col, farbe in FARBEN.items():
-        val = row.get(col)
-        w = max(3, int(float(val) * 40)) if pd.notna(val) else 3
+        v = row.get(col)
+        w = max(3, int(float(v) * 40)) if pd.notna(v) else 3
         bars += f'<div style="width:{w}px;height:14px;border-radius:3px;background:{farbe};opacity:0.85;display:inline-block;margin-right:3px"></div>'
-    return f"""
-    <div style="display:flex;align-items:center;padding:8px 10px;border-bottom:0.5px solid #f3f5f7;font-size:0.88rem;">
+    bl_kuerzel = BL.get(row["bundesland"], row["bundesland"][:2].upper())
+    return f"""<div style="display:flex;align-items:center;padding:8px 10px;
+        border-bottom:0.5px solid #f3f5f7;font-size:0.88rem;">
         <div style="width:28px;color:#c0cdd8;font-size:0.8rem">{rang}</div>
-        <div style="flex:1;font-weight:500;color:#0f1923">{row['name']} <span style="font-size:0.72rem;color:#b0bec8">{row['bundesland'][:2].upper()}</span></div>
-        <div style="display:flex;align-items:center;gap:3px;margin-right:12px">{bars}</div>
+        <div style="flex:1;font-weight:500;color:#0f1923">{row['name']}
+            <span style="font-size:0.72rem;color:#b0bec8;margin-left:4px">{bl_kuerzel}</span>
+        </div>
+        <div style="display:flex;align-items:center;margin-right:12px">{bars}</div>
         <div style="font-weight:500;color:#0f1923;width:36px;text-align:right">{score_txt}</div>
     </div>"""
 
 col_links, col_rechts = st.columns(2)
-
 with col_links:
     for _, row in df_sorted.iloc[:10].iterrows():
         st.markdown(ranking_zeile(row), unsafe_allow_html=True)
-
 with col_rechts:
     for _, row in df_sorted.iloc[10:].iterrows():
         st.markdown(ranking_zeile(row), unsafe_allow_html=True)
 
-st.markdown("""
-<div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;">
+st.markdown("""<div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;">
     <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#9aabba"><span style="width:10px;height:10px;border-radius:2px;background:#5DCAA5;display:inline-block"></span>Klima</span>
     <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#9aabba"><span style="width:10px;height:10px;border-radius:2px;background:#378ADD;display:inline-block"></span>Wohnen</span>
     <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#9aabba"><span style="width:10px;height:10px;border-radius:2px;background:#EF9F27;display:inline-block"></span>Wirtschaft</span>
     <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#9aabba"><span style="width:10px;height:10px;border-radius:2px;background:#D85A30;display:inline-block"></span>Infrastruktur</span>
-</div>
-""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------
 # Detailansicht
