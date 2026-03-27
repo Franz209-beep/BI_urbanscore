@@ -162,8 +162,18 @@ def get_stadt_id(conn, name):
 
 
 def bereits_vorhanden(conn, tabelle, stadt_id, zeit_id):
-    """Prüft ob ein Datensatz existiert UND vollständig ist.
-    Einzelne Felder mit 0 werden als unvollständig gewertet und neu abgefragt.
+    """
+    Cache-Konzept pro Dimension:
+
+    - Statische Daten (miete, arbeitsmarkt, sicherheit, wetter):
+      Einmal pro Jahr gespeichert → immer als vollständig gelten lassen.
+
+    - Overpass-Daten (infrastruktur, bildung, gesundheit, freizeit):
+      Nur neu abfragen wenn ALLE Kernfelder einer Dimension 0 sind.
+      Begründung: Ein einzelnes 0-Feld kann realistisch sein
+      (z.B. kleine Stadt ohne Uni, oder wenige Kultureinrichtungen).
+      Erst wenn komplett nichts gefunden wurde war es sehr wahrscheinlich
+      ein Timeout-Fehler.
     """
     row = conn.execute(
         f"SELECT 1 FROM {tabelle} WHERE stadt_id = ? AND zeit_id = ?",
@@ -173,20 +183,29 @@ def bereits_vorhanden(conn, tabelle, stadt_id, zeit_id):
         return False
 
     def loesche_und_false(grund):
-        print(f"  [Cache] {tabelle} unvollständig ({grund}) → wird neu abgefragt")
+        print(f"  [Cache] {tabelle}: {grund} → Eintrag wird gelöscht und neu abgefragt")
         conn.execute(f"DELETE FROM {tabelle} WHERE stadt_id = ? AND zeit_id = ?",
                      (stadt_id, zeit_id))
         conn.commit()
         return False
 
-    if tabelle == "bildungsdaten":
+    # ── Overpass: alle Kernfelder müssen 0 sein um als Timeout zu gelten ──
+
+    if tabelle == "infrastruktur":
+        r = conn.execute(
+            "SELECT haltestellen_anzahl, poi_dichte FROM infrastruktur "
+            "WHERE stadt_id = ? AND zeit_id = ?", (stadt_id, zeit_id)
+        ).fetchone()
+        if r and ((r[0] or 0) == 0 or (r[1] or 0.0) == 0.0):
+            return loesche_und_false("Haltestellen=0 oder POI-Dichte=0")
+
+    elif tabelle == "bildungsdaten":
         r = conn.execute(
             "SELECT schulen_anzahl, kitas_anzahl, unis_anzahl FROM bildungsdaten "
             "WHERE stadt_id = ? AND zeit_id = ?", (stadt_id, zeit_id)
         ).fetchone()
-        if r:
-            if (r[0] or 0) == 0 and (r[1] or 0) == 0:
-                return loesche_und_false("Schulen=0 und Kitas=0")
+        if r and ((r[0] or 0) == 0 or (r[1] or 0) == 0 or (r[2] or 0) == 0):
+            return loesche_und_false("Schulen=0 oder Kitas=0 oder Unis=0")
 
     elif tabelle == "gesundheitsdaten":
         r = conn.execute(
@@ -194,32 +213,18 @@ def bereits_vorhanden(conn, tabelle, stadt_id, zeit_id):
             "FROM gesundheitsdaten WHERE stadt_id = ? AND zeit_id = ?",
             (stadt_id, zeit_id)
         ).fetchone()
-        if r:
-            # Jedes Feld einzeln prüfen – Berlin hat Ärzte aber keine Apotheken
-            if (r[1] or 0) == 0:   # Apotheken fehlen
-                return loesche_und_false("Apotheken=0")
-            if (r[0] or 0) == 0:   # Ärzte fehlen
-                return loesche_und_false("Aerzte=0")
+        if r and ((r[0] or 0) == 0 or (r[1] or 0) == 0 or (r[2] or 0) == 0):
+            return loesche_und_false("Aerzte=0 oder Apotheken=0 oder Krankenhaeuser=0")
 
     elif tabelle == "freizeitdaten":
         r = conn.execute(
             "SELECT parks_anzahl, kultur_anzahl, sport_anzahl FROM freizeitdaten "
             "WHERE stadt_id = ? AND zeit_id = ?", (stadt_id, zeit_id)
         ).fetchone()
-        if r:
-            if (r[1] or 0) == 0:   # Kultur fehlt
-                return loesche_und_false("Kultur=0")
-            if (r[0] or 0) == 0 and (r[2] or 0) == 0:
-                return loesche_und_false("Parks=0 und Sport=0")
+        if r and ((r[0] or 0) == 0 or (r[1] or 0) == 0 or (r[2] or 0) == 0):
+            return loesche_und_false("Parks=0 oder Kultur=0 oder Sport=0")
 
-    elif tabelle == "infrastruktur":
-        r = conn.execute(
-            "SELECT haltestellen_anzahl, poi_dichte FROM infrastruktur "
-            "WHERE stadt_id = ? AND zeit_id = ?", (stadt_id, zeit_id)
-        ).fetchone()
-        if r and (r[0] or 0) == 0 and (r[1] or 0.0) == 0.0:
-            return loesche_und_false("Haltestellen=0 und POI=0")
-
+    # Statische Daten und vollständige Overpass-Einträge → cachen
     return True
 
 
@@ -948,23 +953,28 @@ def main():
                 if daten:
                     loader(conn, stadt_id, zeit_id, daten)
 
-        # Overpass-Daten (nur montags)
+        # Overpass-Daten:
+        # - Reguläres Update: nur montags (overpass_tag)
+        # - Fehlende/unvollständige Daten: immer abfragen (unabhängig vom Wochentag)
         for tabelle, extractor, loader in [
-            ("infrastruktur",  extract_infrastruktur, load_infrastruktur),
-            ("bildungsdaten",  extract_bildung,       load_bildung),
-            ("gesundheitsdaten", extract_gesundheit,  load_gesundheit),
-            ("freizeitdaten",  extract_freizeit,      load_freizeit),
+            ("infrastruktur",    extract_infrastruktur, load_infrastruktur),
+            ("bildungsdaten",    extract_bildung,       load_bildung),
+            ("gesundheitsdaten", extract_gesundheit,    load_gesundheit),
+            ("freizeitdaten",    extract_freizeit,      load_freizeit),
         ]:
-            if bereits_vorhanden(conn, tabelle, stadt_id, zeit_id):
-                print(f"  [Cache] {tabelle}: bereits vorhanden")
-            elif overpass_tag:
+            vorhanden = bereits_vorhanden(conn, tabelle, stadt_id, zeit_id)
+            if vorhanden:
+                print(f"  [Cache] {tabelle}: vollständig vorhanden")
+            elif overpass_tag or not vorhanden:
+                # Neu abfragen wenn: (a) regulärer Montags-Lauf, oder
+                #                    (b) Daten fehlen/wurden als unvollständig erkannt
+                grund = "Montags-Update" if overpass_tag else "Daten fehlend oder unvollständig"
+                print(f"  [{tabelle}] wird abgerufen ({grund})")
                 time.sleep(10)
                 daten = extractor(stadt)
                 if daten:
                     loader(conn, stadt_id, zeit_id, daten)
                 time.sleep(10)
-            else:
-                print(f"  [{tabelle}] wird nur montags aktualisiert")
 
         conn.commit()
         print()
