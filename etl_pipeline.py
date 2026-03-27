@@ -1,10 +1,16 @@
 """
-UrbanScore ETL-Pipeline (Optimiert)
+UrbanScore ETL-Pipeline (Erweitert)
 =====================================
-Optimierungen:
+Neue Kategorien:
+- Bildung     (Schulen, Kitas, Unis via Overpass)
+- Gesundheit  (Ärzte, Krankenhäuser via Overpass)
+- Freizeit    (Parks, Kultur, Seen via Overpass)
+- Sicherheit  (Kriminalstatistik – statische Daten BKA 2023)
+
+Optimierungen (beibehalten):
 1. Caching: Bereits vorhandene Daten werden nicht erneut abgerufen
-2. Parallele Abfragen: Open-Meteo und statische Daten laufen gleichzeitig
-3. Overpass nur wöchentlich: Infrastrukturdaten ändern sich kaum täglich
+2. Parallele Abfragen: Open-Meteo läuft parallel
+3. Overpass nur wöchentlich (montags)
 """
 
 import os
@@ -13,7 +19,7 @@ import time
 import sqlite3
 import requests
 import pandas as pd
-from datetime import date, timedelta
+from datetime import date
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sklearn.preprocessing import MinMaxScaler
 
@@ -45,6 +51,10 @@ STAEDTE = [
     {"name": "Bonn",        "ags": "05314000", "lat": 50.7374, "lon":  7.0982, "radius_km": 10},
     {"name": "Münster",     "ags": "05515000", "lat": 51.9607, "lon":  7.6261, "radius_km": 10},
 ]
+
+# ---------------------------------------------------------------
+# Statische Daten (unveränderlich / jährlich)
+# ---------------------------------------------------------------
 
 MIETPREISE_STATISCH = {
     "Berlin":      {"mietpreis_kalt_qm": 13.20, "anzahl_inserate": 0},
@@ -92,11 +102,35 @@ ARBEITSMARKT_STATISCH = {
     "Münster":     {"arbeitslosenquote":  5.1, "offene_stellen": None},
 }
 
+# Quelle: BKA PKS 2023, Straftaten je 100.000 Einwohner
+KRIMINALITAET_STATISCH = {
+    "Berlin":      {"straftaten_je_100k": 15823, "gewaltdelikte_je_100k": 384},
+    "Hamburg":     {"straftaten_je_100k": 14201, "gewaltdelikte_je_100k": 341},
+    "München":     {"straftaten_je_100k":  9812, "gewaltdelikte_je_100k": 198},
+    "Köln":        {"straftaten_je_100k": 13450, "gewaltdelikte_je_100k": 312},
+    "Frankfurt":   {"straftaten_je_100k": 16234, "gewaltdelikte_je_100k": 398},
+    "Düsseldorf":  {"straftaten_je_100k": 12980, "gewaltdelikte_je_100k": 287},
+    "Stuttgart":   {"straftaten_je_100k": 11203, "gewaltdelikte_je_100k": 245},
+    "Leipzig":     {"straftaten_je_100k": 12801, "gewaltdelikte_je_100k": 298},
+    "Dortmund":    {"straftaten_je_100k": 13920, "gewaltdelikte_je_100k": 356},
+    "Bremen":      {"straftaten_je_100k": 13100, "gewaltdelikte_je_100k": 318},
+    "Essen":       {"straftaten_je_100k": 12450, "gewaltdelikte_je_100k": 302},
+    "Dresden":     {"straftaten_je_100k": 10980, "gewaltdelikte_je_100k": 231},
+    "Hannover":    {"straftaten_je_100k": 13560, "gewaltdelikte_je_100k": 327},
+    "Nürnberg":    {"straftaten_je_100k": 12100, "gewaltdelikte_je_100k": 276},
+    "Duisburg":    {"straftaten_je_100k": 13780, "gewaltdelikte_je_100k": 348},
+    "Bochum":      {"straftaten_je_100k": 11890, "gewaltdelikte_je_100k": 271},
+    "Wuppertal":   {"straftaten_je_100k": 12340, "gewaltdelikte_je_100k": 289},
+    "Bielefeld":   {"straftaten_je_100k": 11020, "gewaltdelikte_je_100k": 241},
+    "Bonn":        {"straftaten_je_100k": 10450, "gewaltdelikte_je_100k": 219},
+    "Münster":     {"straftaten_je_100k":  9230, "gewaltdelikte_je_100k": 187},
+}
+
 JAHR = date.today().year
 
 
 # ---------------------------------------------------------------
-# Hilfsfunktionen
+# DB-Hilfsfunktionen
 # ---------------------------------------------------------------
 
 def get_conn():
@@ -124,13 +158,7 @@ def get_stadt_id(conn, name):
     return row[0] if row else None
 
 
-# ---------------------------------------------------------------
-# OPTIMIERUNG 1: Cache-Prüfung
-# Gibt True zurück wenn ein Eintrag bereits vorhanden ist
-# ---------------------------------------------------------------
-
 def bereits_vorhanden(conn, tabelle, stadt_id, zeit_id):
-    """Prüft ob bereits ein Datensatz für diese Stadt+Zeitraum existiert."""
     row = conn.execute(
         f"SELECT 1 FROM {tabelle} WHERE stadt_id = ? AND zeit_id = ?",
         (stadt_id, zeit_id)
@@ -138,16 +166,81 @@ def bereits_vorhanden(conn, tabelle, stadt_id, zeit_id):
     return row is not None
 
 
-def overpass_diese_woche_vorhanden(conn, stadt_id, zeit_id):
-    """
-    Prüft ob Infrastrukturdaten in den letzten 7 Tagen abgerufen wurden.
-    Overpass wird nur wöchentlich aktualisiert.
-    """
-    return bereits_vorhanden(conn, "infrastruktur", stadt_id, zeit_id)
+# ---------------------------------------------------------------
+# DB-Schema: Neue Tabellen anlegen
+# ---------------------------------------------------------------
+
+def erstelle_neue_tabellen(conn):
+    """Legt die 3 neuen Tabellen an, falls noch nicht vorhanden."""
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS bildungsdaten (
+            bildung_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+            stadt_id     INTEGER NOT NULL REFERENCES stadt(stadt_id),
+            zeit_id      INTEGER NOT NULL REFERENCES zeit(zeit_id),
+            schulen_anzahl      INTEGER,
+            kitas_anzahl        INTEGER,
+            unis_anzahl         INTEGER,
+            bildungs_dichte     REAL,
+            UNIQUE(stadt_id, zeit_id)
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS gesundheitsdaten (
+            gesundheit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stadt_id      INTEGER NOT NULL REFERENCES stadt(stadt_id),
+            zeit_id       INTEGER NOT NULL REFERENCES zeit(zeit_id),
+            aerzte_anzahl        INTEGER,
+            krankenhaeuser_anzahl INTEGER,
+            apotheken_anzahl     INTEGER,
+            gesundheits_dichte   REAL,
+            UNIQUE(stadt_id, zeit_id)
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS freizeitdaten (
+            freizeit_id  INTEGER PRIMARY KEY AUTOINCREMENT,
+            stadt_id     INTEGER NOT NULL REFERENCES stadt(stadt_id),
+            zeit_id      INTEGER NOT NULL REFERENCES zeit(zeit_id),
+            parks_anzahl        INTEGER,
+            kultur_anzahl       INTEGER,
+            sport_anzahl        INTEGER,
+            freizeit_dichte     REAL,
+            UNIQUE(stadt_id, zeit_id)
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sicherheitsdaten (
+            sicherheit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stadt_id      INTEGER NOT NULL REFERENCES stadt(stadt_id),
+            zeit_id       INTEGER NOT NULL REFERENCES zeit(zeit_id),
+            straftaten_je_100k      INTEGER,
+            gewaltdelikte_je_100k   INTEGER,
+            UNIQUE(stadt_id, zeit_id)
+        )
+    """)
+
+    # Ranking-Tabelle um neue Score-Spalten erweitern
+    for col in [
+        "score_bildung REAL",
+        "score_gesundheit REAL",
+        "score_freizeit REAL",
+        "score_sicherheit REAL",
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE ranking ADD COLUMN {col}")
+        except Exception:
+            pass  # Spalte existiert bereits
+
+    conn.commit()
+    print("  [DB] Neue Tabellen und Spalten bereit.")
 
 
 # ---------------------------------------------------------------
-# EXTRACT: Open-Meteo (Wetter)
+# EXTRACT: Wetter (parallel, unverändert)
 # ---------------------------------------------------------------
 
 def extract_wetter(stadt):
@@ -179,26 +272,40 @@ def extract_wetter(stadt):
         return None
 
 
+def wetter_parallel(staedte_liste):
+    ergebnisse = {}
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(extract_wetter, stadt): stadt["name"]
+                   for stadt in staedte_liste}
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                ergebnisse[name] = future.result()
+            except Exception as e:
+                print(f"  [Wetter] FEHLER {name}: {e}")
+                ergebnisse[name] = None
+    return ergebnisse
+
+
 # ---------------------------------------------------------------
-# EXTRACT: Statische Daten (Miete + Arbeitsmarkt)
+# EXTRACT: Statische Daten
 # ---------------------------------------------------------------
 
 def extract_miete(stadt):
-    daten = MIETPREISE_STATISCH.get(stadt["name"])
-    if daten:
-        print(f"  [Miete] {stadt['name']}: {daten['mietpreis_kalt_qm']} EUR/m2")
-    return daten
-
+    return MIETPREISE_STATISCH.get(stadt["name"])
 
 def extract_arbeitsmarkt(stadt):
-    daten = ARBEITSMARKT_STATISCH.get(stadt["name"])
+    return ARBEITSMARKT_STATISCH.get(stadt["name"])
+
+def extract_sicherheit(stadt):
+    daten = KRIMINALITAET_STATISCH.get(stadt["name"])
     if daten:
-        print(f"  [Arbeit] {stadt['name']}: {daten['arbeitslosenquote']}%")
+        print(f"  [Sicherheit] {stadt['name']}: {daten['straftaten_je_100k']} Straft./100k")
     return daten
 
 
 # ---------------------------------------------------------------
-# EXTRACT: Overpass (Infrastruktur) — mit Retry
+# EXTRACT: Overpass (Infrastruktur – unverändert)
 # ---------------------------------------------------------------
 
 def extract_infrastruktur(stadt):
@@ -244,9 +351,144 @@ def extract_infrastruktur(stadt):
             print(f"  [Infra] Versuch {versuch+1}/3 fehlgeschlagen ({stadt['name']}): {e}")
             if versuch < 2:
                 time.sleep(20)
-
-    print(f"  [Infra] {stadt['name']}: alle Versuche fehlgeschlagen")
     return None
+
+
+# ---------------------------------------------------------------
+# EXTRACT: Overpass – Bildung, Gesundheit, Freizeit (NEU)
+# ---------------------------------------------------------------
+
+def _overpass_count(query):
+    """Hilfsfunktion: Sendet eine Overpass-Abfrage und gibt die Anzahl zurück."""
+    overpass_url = "https://overpass-api.de/api/interpreter"
+    for versuch in range(3):
+        try:
+            resp = requests.post(overpass_url, data=query, timeout=70)
+            resp.raise_for_status()
+            return int(resp.json()["elements"][0]["tags"]["total"])
+        except Exception as e:
+            print(f"    [Overpass] Versuch {versuch+1}/3: {e}")
+            if versuch < 2:
+                time.sleep(15)
+    return 0
+
+
+def extract_bildung(stadt):
+    """Schulen, Kitas, Universitäten via Overpass."""
+    lat = stadt["lat"]
+    lon = stadt["lon"]
+    rad = stadt["radius_km"] * 1000
+
+    schulen = _overpass_count(f"""
+    [out:json][timeout:60];
+    (node["amenity"="school"](around:{rad},{lat},{lon});
+     way["amenity"="school"](around:{rad},{lat},{lon}););
+    out count;
+    """)
+    time.sleep(5)
+    kitas = _overpass_count(f"""
+    [out:json][timeout:60];
+    (node["amenity"="kindergarten"](around:{rad},{lat},{lon});
+     way["amenity"="kindergarten"](around:{rad},{lat},{lon}););
+    out count;
+    """)
+    time.sleep(5)
+    unis = _overpass_count(f"""
+    [out:json][timeout:60];
+    (node["amenity"="university"](around:{rad},{lat},{lon});
+     node["amenity"="college"](around:{rad},{lat},{lon});
+     way["amenity"="university"](around:{rad},{lat},{lon}););
+    out count;
+    """)
+
+    flaeche = math.pi * (stadt["radius_km"] ** 2)
+    dichte  = round((schulen + kitas + unis) / flaeche, 3)
+    print(f"  [Bildung] {stadt['name']}: {schulen} Schulen, {kitas} Kitas, {unis} Unis → {dichte}/km²")
+    return {
+        "schulen_anzahl":   schulen,
+        "kitas_anzahl":     kitas,
+        "unis_anzahl":      unis,
+        "bildungs_dichte":  dichte,
+    }
+
+
+def extract_gesundheit(stadt):
+    """Ärzte, Krankenhäuser, Apotheken via Overpass."""
+    lat = stadt["lat"]
+    lon = stadt["lon"]
+    rad = stadt["radius_km"] * 1000
+
+    aerzte = _overpass_count(f"""
+    [out:json][timeout:60];
+    (node["amenity"="doctors"](around:{rad},{lat},{lon});
+     node["amenity"="clinic"](around:{rad},{lat},{lon}););
+    out count;
+    """)
+    time.sleep(5)
+    krankenhaeuser = _overpass_count(f"""
+    [out:json][timeout:60];
+    (node["amenity"="hospital"](around:{rad},{lat},{lon});
+     way["amenity"="hospital"](around:{rad},{lat},{lon}););
+    out count;
+    """)
+    time.sleep(5)
+    apotheken = _overpass_count(f"""
+    [out:json][timeout:60];
+    (node["amenity"="pharmacy"](around:{rad},{lat},{lon}););
+    out count;
+    """)
+
+    flaeche = math.pi * (stadt["radius_km"] ** 2)
+    dichte  = round((aerzte + krankenhaeuser + apotheken) / flaeche, 3)
+    print(f"  [Gesundheit] {stadt['name']}: {aerzte} Ärzte, {krankenhaeuser} KH, {apotheken} Apotheken")
+    return {
+        "aerzte_anzahl":          aerzte,
+        "krankenhaeuser_anzahl":  krankenhaeuser,
+        "apotheken_anzahl":       apotheken,
+        "gesundheits_dichte":     dichte,
+    }
+
+
+def extract_freizeit(stadt):
+    """Parks, Kultureinrichtungen, Sportstätten via Overpass."""
+    lat = stadt["lat"]
+    lon = stadt["lon"]
+    rad = stadt["radius_km"] * 1000
+
+    parks = _overpass_count(f"""
+    [out:json][timeout:60];
+    (node["leisure"="park"](around:{rad},{lat},{lon});
+     way["leisure"="park"](around:{rad},{lat},{lon});
+     way["leisure"="nature_reserve"](around:{rad},{lat},{lon}););
+    out count;
+    """)
+    time.sleep(5)
+    kultur = _overpass_count(f"""
+    [out:json][timeout:60];
+    (node["amenity"="theatre"](around:{rad},{lat},{lon});
+     node["amenity"="cinema"](around:{rad},{lat},{lon});
+     node["tourism"="museum"](around:{rad},{lat},{lon});
+     node["amenity"="arts_centre"](around:{rad},{lat},{lon}););
+    out count;
+    """)
+    time.sleep(5)
+    sport = _overpass_count(f"""
+    [out:json][timeout:60];
+    (node["leisure"="sports_centre"](around:{rad},{lat},{lon});
+     node["leisure"="swimming_pool"](around:{rad},{lat},{lon});
+     way["leisure"="pitch"](around:{rad},{lat},{lon}););
+    out count;
+    """)
+
+    flaeche = math.pi * (stadt["radius_km"] ** 2)
+    dichte  = round((parks + kultur + sport) / flaeche, 3)
+    print(f"  [Freizeit] {stadt['name']}: {parks} Parks, {kultur} Kultur, {sport} Sport")
+    return {
+        "parks_anzahl":     parks,
+        "kultur_anzahl":    kultur,
+        "sport_anzahl":     sport,
+        "freizeit_dichte":  dichte,
+    }
 
 
 # ---------------------------------------------------------------
@@ -296,81 +538,143 @@ def load_infrastruktur(conn, stadt_id, zeit_id, d):
     """, (stadt_id, zeit_id, d["haltestellen_anzahl"], d["poi_dichte"]))
 
 
-# ---------------------------------------------------------------
-# OPTIMIERUNG 2: Parallele Wetter-Abfragen
-# Open-Meteo hat kein Rate-Limit — alle 20 Städte gleichzeitig
-# ---------------------------------------------------------------
-
-def wetter_parallel(staedte_liste):
-    """Ruft Wetterdaten für alle Städte gleichzeitig ab (max. 5 parallel)."""
-    ergebnisse = {}
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(extract_wetter, stadt): stadt["name"]
-                   for stadt in staedte_liste}
-        for future in as_completed(futures):
-            name = futures[future]
-            try:
-                ergebnisse[name] = future.result()
-            except Exception as e:
-                print(f"  [Wetter] FEHLER {name}: {e}")
-                ergebnisse[name] = None
-    return ergebnisse
+def load_bildung(conn, stadt_id, zeit_id, d):
+    conn.execute("""
+        INSERT INTO bildungsdaten
+            (stadt_id, zeit_id, schulen_anzahl, kitas_anzahl, unis_anzahl, bildungs_dichte)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(stadt_id, zeit_id) DO UPDATE SET
+            schulen_anzahl   = excluded.schulen_anzahl,
+            kitas_anzahl     = excluded.kitas_anzahl,
+            unis_anzahl      = excluded.unis_anzahl,
+            bildungs_dichte  = excluded.bildungs_dichte
+    """, (stadt_id, zeit_id,
+          d["schulen_anzahl"], d["kitas_anzahl"], d["unis_anzahl"], d["bildungs_dichte"]))
 
 
+def load_gesundheit(conn, stadt_id, zeit_id, d):
+    conn.execute("""
+        INSERT INTO gesundheitsdaten
+            (stadt_id, zeit_id, aerzte_anzahl, krankenhaeuser_anzahl, apotheken_anzahl, gesundheits_dichte)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(stadt_id, zeit_id) DO UPDATE SET
+            aerzte_anzahl          = excluded.aerzte_anzahl,
+            krankenhaeuser_anzahl  = excluded.krankenhaeuser_anzahl,
+            apotheken_anzahl       = excluded.apotheken_anzahl,
+            gesundheits_dichte     = excluded.gesundheits_dichte
+    """, (stadt_id, zeit_id,
+          d["aerzte_anzahl"], d["krankenhaeuser_anzahl"],
+          d["apotheken_anzahl"], d["gesundheits_dichte"]))
+
+
+def load_freizeit(conn, stadt_id, zeit_id, d):
+    conn.execute("""
+        INSERT INTO freizeitdaten
+            (stadt_id, zeit_id, parks_anzahl, kultur_anzahl, sport_anzahl, freizeit_dichte)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(stadt_id, zeit_id) DO UPDATE SET
+            parks_anzahl    = excluded.parks_anzahl,
+            kultur_anzahl   = excluded.kultur_anzahl,
+            sport_anzahl    = excluded.sport_anzahl,
+            freizeit_dichte = excluded.freizeit_dichte
+    """, (stadt_id, zeit_id,
+          d["parks_anzahl"], d["kultur_anzahl"], d["sport_anzahl"], d["freizeit_dichte"]))
+
+
+def load_sicherheit(conn, stadt_id, zeit_id, d):
+    conn.execute("""
+        INSERT INTO sicherheitsdaten
+            (stadt_id, zeit_id, straftaten_je_100k, gewaltdelikte_je_100k)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(stadt_id, zeit_id) DO UPDATE SET
+            straftaten_je_100k    = excluded.straftaten_je_100k,
+            gewaltdelikte_je_100k = excluded.gewaltdelikte_je_100k
+    """, (stadt_id, zeit_id,
+          d["straftaten_je_100k"], d["gewaltdelikte_je_100k"]))
+
+
 # ---------------------------------------------------------------
-# TRANSFORM: Ranking
+# TRANSFORM: Ranking (erweitert um 4 neue Scores)
 # ---------------------------------------------------------------
 
 def berechne_ranking(conn, zeit_id):
     query = """
         SELECT s.stadt_id, s.name,
-            w.sonnenstunden_jahr, m.mietpreis_kalt_qm,
-            a.arbeitslosenquote,  i.poi_dichte
+            w.sonnenstunden_jahr,
+            m.mietpreis_kalt_qm,
+            a.arbeitslosenquote,
+            i.poi_dichte,
+            b.bildungs_dichte,
+            g.gesundheits_dichte,
+            f.freizeit_dichte,
+            si.straftaten_je_100k
         FROM stadt s
-        LEFT JOIN wetterdaten       w ON w.stadt_id = s.stadt_id AND w.zeit_id = ?
-        LEFT JOIN mietdaten         m ON m.stadt_id = s.stadt_id AND m.zeit_id = ?
-        LEFT JOIN arbeitsmarktdaten a ON a.stadt_id = s.stadt_id AND a.zeit_id = ?
-        LEFT JOIN infrastruktur     i ON i.stadt_id = s.stadt_id AND i.zeit_id = ?
+        LEFT JOIN wetterdaten       w  ON w.stadt_id  = s.stadt_id AND w.zeit_id  = ?
+        LEFT JOIN mietdaten         m  ON m.stadt_id  = s.stadt_id AND m.zeit_id  = ?
+        LEFT JOIN arbeitsmarktdaten a  ON a.stadt_id  = s.stadt_id AND a.zeit_id  = ?
+        LEFT JOIN infrastruktur     i  ON i.stadt_id  = s.stadt_id AND i.zeit_id  = ?
+        LEFT JOIN bildungsdaten     b  ON b.stadt_id  = s.stadt_id AND b.zeit_id  = ?
+        LEFT JOIN gesundheitsdaten  g  ON g.stadt_id  = s.stadt_id AND g.zeit_id  = ?
+        LEFT JOIN freizeitdaten     f  ON f.stadt_id  = s.stadt_id AND f.zeit_id  = ?
+        LEFT JOIN sicherheitsdaten  si ON si.stadt_id = s.stadt_id AND si.zeit_id = ?
     """
-    df = pd.read_sql_query(query, conn, params=(zeit_id,) * 4)
+    df = pd.read_sql_query(query, conn, params=(zeit_id,) * 8)
     if df.empty:
         print("  [Ranking] Keine Daten.")
         return
 
     scaler = MinMaxScaler()
 
-    df["score_klima"] = scaler.fit_transform(
-        df[["sonnenstunden_jahr"]].fillna(df["sonnenstunden_jahr"].mean())
-    ) if df["sonnenstunden_jahr"].notna().any() else 0.5
+    def score_hoch(col):
+        """Höher = besser"""
+        filled = df[[col]].fillna(df[col].mean())
+        return scaler.fit_transform(filled).flatten() if df[col].notna().any() else 0.5
 
-    df["score_wohnen"] = 1 - scaler.fit_transform(
-        df[["mietpreis_kalt_qm"]].fillna(df["mietpreis_kalt_qm"].mean())
-    ) if df["mietpreis_kalt_qm"].notna().any() else 0.5
+    def score_niedrig(col):
+        """Niedriger = besser (invertiert)"""
+        filled = df[[col]].fillna(df[col].mean())
+        return (1 - scaler.fit_transform(filled)).flatten() if df[col].notna().any() else 0.5
 
-    df["score_wirtschaft"] = 1 - scaler.fit_transform(
-        df[["arbeitslosenquote"]].fillna(df["arbeitslosenquote"].mean())
-    ) if df["arbeitslosenquote"].notna().any() else 0.5
+    df["score_klima"]         = score_hoch("sonnenstunden_jahr")
+    df["score_wohnen"]        = score_niedrig("mietpreis_kalt_qm")
+    df["score_wirtschaft"]    = score_niedrig("arbeitslosenquote")
+    df["score_infrastruktur"] = score_hoch("poi_dichte")
+    df["score_bildung"]       = score_hoch("bildungs_dichte")
+    df["score_gesundheit"]    = score_hoch("gesundheits_dichte")
+    df["score_freizeit"]      = score_hoch("freizeit_dichte")
+    df["score_sicherheit"]    = score_niedrig("straftaten_je_100k")
 
-    df["score_infrastruktur"] = scaler.fit_transform(
-        df[["poi_dichte"]].fillna(df["poi_dichte"].mean())
-    ) if df["poi_dichte"].notna().any() else 0.5
-
-    GEWICHTE = {"score_klima": 0.20, "score_wohnen": 0.30,
-                "score_wirtschaft": 0.30, "score_infrastruktur": 0.20}
+    # Gewichtung (Summe = 1.0)
+    GEWICHTE = {
+        "score_klima":         0.10,
+        "score_wohnen":        0.20,
+        "score_wirtschaft":    0.20,
+        "score_infrastruktur": 0.10,
+        "score_bildung":       0.15,
+        "score_gesundheit":    0.10,
+        "score_freizeit":      0.05,
+        "score_sicherheit":    0.10,
+    }
     df["gesamtscore"] = sum(df[col] * w for col, w in GEWICHTE.items())
     df["rang"] = df["gesamtscore"].rank(ascending=False, method="min").astype(int)
 
     for _, row in df.iterrows():
         conn.execute("""
             INSERT INTO ranking
-                (stadt_id, zeit_id, score_klima, score_wohnen,
-                 score_wirtschaft, score_infrastruktur, gesamtscore, rang)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (stadt_id, zeit_id,
+                 score_klima, score_wohnen, score_wirtschaft, score_infrastruktur,
+                 score_bildung, score_gesundheit, score_freizeit, score_sicherheit,
+                 gesamtscore, rang)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(stadt_id, zeit_id) DO UPDATE SET
                 score_klima         = excluded.score_klima,
                 score_wohnen        = excluded.score_wohnen,
                 score_wirtschaft    = excluded.score_wirtschaft,
                 score_infrastruktur = excluded.score_infrastruktur,
+                score_bildung       = excluded.score_bildung,
+                score_gesundheit    = excluded.score_gesundheit,
+                score_freizeit      = excluded.score_freizeit,
+                score_sicherheit    = excluded.score_sicherheit,
                 gesamtscore         = excluded.gesamtscore,
                 rang                = excluded.rang
         """, (
@@ -379,12 +683,16 @@ def berechne_ranking(conn, zeit_id):
             round(float(row["score_wohnen"]),        4),
             round(float(row["score_wirtschaft"]),    4),
             round(float(row["score_infrastruktur"]), 4),
+            round(float(row["score_bildung"]),       4),
+            round(float(row["score_gesundheit"]),    4),
+            round(float(row["score_freizeit"]),      4),
+            round(float(row["score_sicherheit"]),    4),
             round(float(row["gesamtscore"]),         4),
             int(row["rang"]),
         ))
     conn.commit()
     print("\n  [Ranking] Top 5:")
-    print(df[["name","gesamtscore","rang"]].sort_values("rang").head(5).to_string(index=False))
+    print(df[["name", "gesamtscore", "rang"]].sort_values("rang").head(5).to_string(index=False))
 
 
 # ---------------------------------------------------------------
@@ -393,78 +701,77 @@ def berechne_ranking(conn, zeit_id):
 
 def main():
     heute = date.today()
-    # Overpass wird nur montags (weekday=0) oder beim ersten Lauf abgerufen
     overpass_tag = heute.weekday() == 0
 
     print(f"=== UrbanScore ETL-Pipeline gestartet ({heute}) ===")
     print(f"    Städte: {len(STAEDTE)} | Overpass-Update: {'ja' if overpass_tag else 'nein (nur montags)'}\n")
 
     conn    = get_conn()
+    erstelle_neue_tabellen(conn)
     zeit_id = get_oder_erstelle_zeit_id(conn, JAHR)
     print(f"Zeitraum: Jahr {JAHR} (zeit_id={zeit_id})\n")
 
-    # OPTIMIERUNG 2: Wetterdaten parallel für alle Städte abrufen
+    # Wetterdaten parallel
     print("--- Wetterdaten werden parallel abgerufen ---")
-    staedte_ohne_wetter = []
-    for stadt in STAEDTE:
-        stadt_id = get_stadt_id(conn, stadt["name"])
-        if stadt_id and not bereits_vorhanden(conn, "wetterdaten", stadt_id, zeit_id):
-            staedte_ohne_wetter.append(stadt)
-        elif stadt_id:
-            print(f"  [Cache] Wetter {stadt['name']}: bereits vorhanden, wird übersprungen")
-
+    staedte_ohne_wetter = [
+        s for s in STAEDTE
+        if (sid := get_stadt_id(conn, s["name"])) and not bereits_vorhanden(conn, "wetterdaten", sid, zeit_id)
+    ]
     if staedte_ohne_wetter:
         wetter_ergebnisse = wetter_parallel(staedte_ohne_wetter)
         for stadt in staedte_ohne_wetter:
-            stadt_id = get_stadt_id(conn, stadt["name"])
-            wetter   = wetter_ergebnisse.get(stadt["name"])
-            if wetter and stadt_id:
-                load_wetter(conn, stadt_id, zeit_id, wetter)
+            sid = get_stadt_id(conn, stadt["name"])
+            w   = wetter_ergebnisse.get(stadt["name"])
+            if w and sid:
+                load_wetter(conn, sid, zeit_id, w)
         conn.commit()
     print()
 
-    # Statische Daten + Overpass nacheinander (wegen Rate-Limit)
     for i, stadt in enumerate(STAEDTE):
         print(f"--- [{i+1}/{len(STAEDTE)}] {stadt['name']} ---")
         stadt_id = get_stadt_id(conn, stadt["name"])
         if not stadt_id:
-            print(f"  Stadt nicht in DB — bitte staedte_erweitern.sql ausführen.")
+            print("  Stadt nicht in DB — bitte staedte_erweitern.sql ausführen.")
             continue
 
-        # OPTIMIERUNG 1: Statische Daten cachen
-        if bereits_vorhanden(conn, "mietdaten", stadt_id, zeit_id):
-            print(f"  [Cache] Miete: bereits vorhanden")
-        else:
-            miete = extract_miete(stadt)
-            if miete:
-                load_miete(conn, stadt_id, zeit_id, miete)
+        # Statische Daten (immer gecacht)
+        for tabelle, extractor, loader in [
+            ("mietdaten",         extract_miete,       load_miete),
+            ("arbeitsmarktdaten", extract_arbeitsmarkt, load_arbeitsmarkt),
+            ("sicherheitsdaten",  extract_sicherheit,   load_sicherheit),
+        ]:
+            if bereits_vorhanden(conn, tabelle, stadt_id, zeit_id):
+                print(f"  [Cache] {tabelle}: bereits vorhanden")
+            else:
+                daten = extractor(stadt)
+                if daten:
+                    loader(conn, stadt_id, zeit_id, daten)
 
-        if bereits_vorhanden(conn, "arbeitsmarktdaten", stadt_id, zeit_id):
-            print(f"  [Cache] Arbeitsmarkt: bereits vorhanden")
-        else:
-            arbeitsmarkt = extract_arbeitsmarkt(stadt)
-            if arbeitsmarkt:
-                load_arbeitsmarkt(conn, stadt_id, zeit_id, arbeitsmarkt)
+        # Overpass-Daten (nur montags)
+        for tabelle, extractor, loader in [
+            ("infrastruktur",  extract_infrastruktur, load_infrastruktur),
+            ("bildungsdaten",  extract_bildung,       load_bildung),
+            ("gesundheitsdaten", extract_gesundheit,  load_gesundheit),
+            ("freizeitdaten",  extract_freizeit,      load_freizeit),
+        ]:
+            if bereits_vorhanden(conn, tabelle, stadt_id, zeit_id):
+                print(f"  [Cache] {tabelle}: bereits vorhanden")
+            elif overpass_tag:
+                time.sleep(10)
+                daten = extractor(stadt)
+                if daten:
+                    loader(conn, stadt_id, zeit_id, daten)
+                time.sleep(10)
+            else:
+                print(f"  [{tabelle}] wird nur montags aktualisiert")
 
-        # OPTIMIERUNG 3: Overpass nur wöchentlich (montags)
-        if bereits_vorhanden(conn, "infrastruktur", stadt_id, zeit_id):
-            print(f"  [Cache] Infrastruktur: bereits vorhanden")
-        elif overpass_tag:
-            time.sleep(15)
-            infra = extract_infrastruktur(stadt)
-            if infra:
-                load_infrastruktur(conn, stadt_id, zeit_id, infra)
-            time.sleep(10)
-        else:
-            print(f"  [Infra] {stadt['name']}: wird nur montags aktualisiert")
-
+        conn.commit()
         print()
 
-    conn.commit()
     print("--- Ranking wird berechnet ---")
     berechne_ranking(conn, zeit_id)
     conn.close()
-    print(f"\n=== Pipeline abgeschlossen ===")
+    print("\n=== Pipeline abgeschlossen ===")
 
 
 if __name__ == "__main__":
