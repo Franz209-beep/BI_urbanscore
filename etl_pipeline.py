@@ -358,8 +358,8 @@ def extract_infrastruktur(stadt):
 # EXTRACT: Overpass – Bildung, Gesundheit, Freizeit (NEU)
 # ---------------------------------------------------------------
 
+
 def _overpass_count(query):
-    """Hilfsfunktion: Sendet eine Overpass-Abfrage und gibt die Anzahl zurück."""
     overpass_url = "https://overpass-api.de/api/interpreter"
     for versuch in range(3):
         try:
@@ -370,7 +370,7 @@ def _overpass_count(query):
             print(f"    [Overpass] Versuch {versuch+1}/3: {e}")
             if versuch < 2:
                 time.sleep(15)
-    return 0
+    return None 
 
 
 def extract_bildung(stadt):
@@ -384,14 +384,14 @@ def extract_bildung(stadt):
     (node["amenity"="school"](around:{rad},{lat},{lon});
      way["amenity"="school"](around:{rad},{lat},{lon}););
     out count;
-    """)
+    """) or 0
     time.sleep(5)
     kitas = _overpass_count(f"""
     [out:json][timeout:60];
     (node["amenity"="kindergarten"](around:{rad},{lat},{lon});
      way["amenity"="kindergarten"](around:{rad},{lat},{lon}););
     out count;
-    """)
+    """) or 0
     time.sleep(5)
     unis = _overpass_count(f"""
     [out:json][timeout:60];
@@ -399,7 +399,7 @@ def extract_bildung(stadt):
      node["amenity"="college"](around:{rad},{lat},{lon});
      way["amenity"="university"](around:{rad},{lat},{lon}););
     out count;
-    """)
+    """) or 0
 
     flaeche = math.pi * (stadt["radius_km"] ** 2)
     dichte  = round((schulen + kitas + unis) / flaeche, 3)
@@ -423,20 +423,20 @@ def extract_gesundheit(stadt):
     (node["amenity"="doctors"](around:{rad},{lat},{lon});
      node["amenity"="clinic"](around:{rad},{lat},{lon}););
     out count;
-    """)
+    """) or 0
     time.sleep(5)
     krankenhaeuser = _overpass_count(f"""
     [out:json][timeout:60];
     (node["amenity"="hospital"](around:{rad},{lat},{lon});
      way["amenity"="hospital"](around:{rad},{lat},{lon}););
     out count;
-    """)
+    """) or 0
     time.sleep(5)
     apotheken = _overpass_count(f"""
     [out:json][timeout:60];
     (node["amenity"="pharmacy"](around:{rad},{lat},{lon}););
     out count;
-    """)
+    """) or 0
 
     flaeche = math.pi * (stadt["radius_km"] ** 2)
     dichte  = round((aerzte + krankenhaeuser + apotheken) / flaeche, 3)
@@ -461,7 +461,7 @@ def extract_freizeit(stadt):
      way["leisure"="park"](around:{rad},{lat},{lon});
      way["leisure"="nature_reserve"](around:{rad},{lat},{lon}););
     out count;
-    """)
+    """) or 0
     time.sleep(5)
     kultur = _overpass_count(f"""
     [out:json][timeout:60];
@@ -470,7 +470,7 @@ def extract_freizeit(stadt):
      node["tourism"="museum"](around:{rad},{lat},{lon});
      node["amenity"="arts_centre"](around:{rad},{lat},{lon}););
     out count;
-    """)
+    """) or 0
     time.sleep(5)
     sport = _overpass_count(f"""
     [out:json][timeout:60];
@@ -478,7 +478,7 @@ def extract_freizeit(stadt):
      node["leisure"="swimming_pool"](around:{rad},{lat},{lon});
      way["leisure"="pitch"](around:{rad},{lat},{lon}););
     out count;
-    """)
+    """) or 0
 
     flaeche = math.pi * (stadt["radius_km"] ** 2)
     dichte  = round((parks + kultur + sport) / flaeche, 3)
@@ -701,8 +701,8 @@ def berechne_ranking(conn, zeit_id):
 
 def main():
     heute = date.today()
-    #overpass_tag = heute.weekday() == 0
-    overpass_tag = True
+    overpass_tag = heute.weekday() == 0
+    #overpass_tag = True
 
     print(f"=== UrbanScore ETL-Pipeline gestartet ({heute}) ===")
     print(f"    Städte: {len(STAEDTE)} | Overpass-Update: {'ja' if overpass_tag else 'nein (nur montags)'}\n")
