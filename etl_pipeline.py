@@ -162,11 +162,67 @@ def get_stadt_id(conn, name):
 
 
 def bereits_vorhanden(conn, tabelle, stadt_id, zeit_id):
+    """Prüft ob ein Datensatz existiert UND vollständig ist.
+    Bei 0-Werten durch Timeouts wird neu abgefragt.
+    """
     row = conn.execute(
         f"SELECT 1 FROM {tabelle} WHERE stadt_id = ? AND zeit_id = ?",
         (stadt_id, zeit_id)
     ).fetchone()
-    return row is not None
+    if not row:
+        return False
+
+    # Tabellen-spezifische Vollständigkeitsprüfung
+    if tabelle == "bildungsdaten":
+        r = conn.execute(
+            "SELECT schulen_anzahl, kitas_anzahl, bildungs_dichte FROM bildungsdaten "
+            "WHERE stadt_id = ? AND zeit_id = ?", (stadt_id, zeit_id)
+        ).fetchone()
+        # Unvollständig wenn alle Hauptwerte 0 oder NULL sind
+        if r and (r[0] or 0) + (r[1] or 0) == 0:
+            print(f"  [Cache] bildungsdaten unvollständig (alle 0) → wird neu abgefragt")
+            conn.execute("DELETE FROM bildungsdaten WHERE stadt_id = ? AND zeit_id = ?",
+                         (stadt_id, zeit_id))
+            conn.commit()
+            return False
+
+    elif tabelle == "gesundheitsdaten":
+        r = conn.execute(
+            "SELECT aerzte_anzahl, apotheken_anzahl, krankenhaeuser_anzahl FROM gesundheitsdaten "
+            "WHERE stadt_id = ? AND zeit_id = ?", (stadt_id, zeit_id)
+        ).fetchone()
+        if r and (r[0] or 0) + (r[1] or 0) + (r[2] or 0) == 0:
+            print(f"  [Cache] gesundheitsdaten unvollständig (alle 0) → wird neu abgefragt")
+            conn.execute("DELETE FROM gesundheitsdaten WHERE stadt_id = ? AND zeit_id = ?",
+                         (stadt_id, zeit_id))
+            conn.commit()
+            return False
+
+    elif tabelle == "freizeitdaten":
+        r = conn.execute(
+            "SELECT parks_anzahl, kultur_anzahl, sport_anzahl FROM freizeitdaten "
+            "WHERE stadt_id = ? AND zeit_id = ?", (stadt_id, zeit_id)
+        ).fetchone()
+        if r and (r[0] or 0) + (r[1] or 0) + (r[2] or 0) == 0:
+            print(f"  [Cache] freizeitdaten unvollständig (alle 0) → wird neu abgefragt")
+            conn.execute("DELETE FROM freizeitdaten WHERE stadt_id = ? AND zeit_id = ?",
+                         (stadt_id, zeit_id))
+            conn.commit()
+            return False
+
+    elif tabelle == "infrastruktur":
+        r = conn.execute(
+            "SELECT haltestellen_anzahl, poi_dichte FROM infrastruktur "
+            "WHERE stadt_id = ? AND zeit_id = ?", (stadt_id, zeit_id)
+        ).fetchone()
+        if r and (r[0] or 0) == 0 and (r[1] or 0.0) == 0.0:
+            print(f"  [Cache] infrastruktur unvollständig (alle 0) → wird neu abgefragt")
+            conn.execute("DELETE FROM infrastruktur WHERE stadt_id = ? AND zeit_id = ?",
+                         (stadt_id, zeit_id))
+            conn.commit()
+            return False
+
+    return True
 
 
 # ---------------------------------------------------------------

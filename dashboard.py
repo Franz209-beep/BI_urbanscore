@@ -23,9 +23,9 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=Inter:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&display=swap');
 
-html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
 
 .us-header {
     background: #111418;
@@ -34,12 +34,12 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     margin-bottom: 1.8rem;
 }
 .us-header h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.9rem;
-    font-weight: 700;
+    font-family: 'DM Serif Display', serif;
+    font-size: 2rem;
+    font-weight: 400;
     color: #f0f2f5;
     margin: 0 0 0.25rem 0;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
 }
 .us-header p { color: #4a5568; font-size: 0.82rem; margin: 0; }
 
@@ -62,7 +62,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .us-top3-rank { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.12em;
                 text-transform: uppercase; color: #a0aec0; margin-bottom: 0.5rem; }
 .us-top3-rank.first { color: #b7791f; }
-.us-top3-city { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 600; color: #111418; }
+.us-top3-city { font-family: 'DM Serif Display', serif; font-size: 1.1rem; font-weight: 400; color: #111418; }
 .us-top3-card.first .us-top3-city { font-size: 1.25rem; }
 .us-top3-state { font-size: 0.72rem; color: #a0aec0; margin-top: 3px; }
 .us-top3-score { font-size: 0.78rem; color: #718096; margin-top: 8px; font-weight: 500; }
@@ -75,12 +75,6 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .us-rank-bars { display: flex; align-items: center; gap: 2px; margin: 0 10px; }
 .us-rank-score { width: 38px; text-align: right; font-weight: 500; color: #111418;
                  font-size: 0.8rem; font-variant-numeric: tabular-nums; }
-
-.us-weight-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; font-size: 0.75rem; }
-.us-weight-label { width: 90px; color: #4a5568; font-weight: 500; flex-shrink: 0; }
-.us-weight-bar-bg { flex: 1; background: #f0f2f5; border-radius: 2px; height: 6px; }
-.us-weight-bar-fill { height: 6px; border-radius: 2px; }
-.us-weight-pct { width: 34px; text-align: right; color: #a0aec0; font-variant-numeric: tabular-nums; }
 
 .us-dim-row {
     display: grid;
@@ -95,14 +89,14 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .us-dim-bar-bg { background: #f0f2f5; border-radius: 2px; height: 7px; }
 .us-dim-bar-fill { height: 7px; border-radius: 2px; }
 .us-dim-details { font-size: 0.69rem; color: #718096; line-height: 1.7; }
-.us-dim-score { font-family: 'Syne', sans-serif; font-size: 1.05rem;
-                font-weight: 700; color: #111418; text-align: right; }
+.us-dim-score { font-family: 'DM Serif Display', serif; font-size: 1.05rem;
+                font-weight: 400; color: #111418; text-align: right; }
 
 .us-corr-stat { background: #fafafa; border: 1px solid #edf2f7; border-radius: 4px;
                 padding: 1.2rem; margin-bottom: 0.8rem; }
 .us-corr-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
                  letter-spacing: 0.1em; color: #a0aec0; margin-bottom: 6px; }
-.us-corr-val { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 700; }
+.us-corr-val { font-family: 'DM Serif Display', serif; font-size: 1.6rem; font-weight: 400; }
 .us-corr-desc { font-size: 0.75rem; color: #718096; margin-top: 4px; line-height: 1.5; }
 </style>
 """, unsafe_allow_html=True)
@@ -296,22 +290,9 @@ if aktive_persona == "Individuell":
     # Normieren auf 100 — kein Overflow möglich
     gesamt_raw = sum(raw.values()) or 1
     gewichte_user = {k: round(v / gesamt_raw * 100, 1) for k, v in raw.items()}
+    st.caption(f"Summe der Gewichte: {sum(gewichte_user.values()):.0f}% (automatisch normiert)")
 else:
     gewichte_user = {k: float(v) for k, v in persona_gewichte.items()}
-
-# Gewichtsbalken anzeigen
-st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
-bar_html = ""
-for name, pct in gewichte_user.items():
-    farbe = DIM_FARBEN[name]
-    bar_html += f"""<div class="us-weight-row">
-        <div class="us-weight-label">{name}</div>
-        <div class="us-weight-bar-bg">
-          <div class="us-weight-bar-fill" style="width:{pct}%;background:{farbe}"></div>
-        </div>
-        <div class="us-weight-pct">{pct:.0f}%</div>
-    </div>"""
-st.markdown(bar_html, unsafe_allow_html=True)
 
 # Personscore (immer 0–1, normiert)
 gesamt_gewicht = sum(gewichte_user.values()) or 1
@@ -349,18 +330,21 @@ if len(df_sorted) >= 3:
     <div class="us-top3">
       <div class="us-top3-card">
         <div class="us-top3-rank">2. Platz</div>
+        <div style="font-size:2rem;margin-bottom:4px">&#x1F948;</div>
         <div class="us-top3-city">{r2['name']}</div>
         <div class="us-top3-state">{bl(r2)}</div>
         <div class="us-top3-score">{fmt_score(r2)}</div>
       </div>
       <div class="us-top3-card first">
         <div class="us-top3-rank first">1. Platz</div>
+        <div style="font-size:2.4rem;margin-bottom:4px">&#x1F947;</div>
         <div class="us-top3-city">{r1['name']}</div>
         <div class="us-top3-state">{bl(r1)}</div>
         <div class="us-top3-score">{fmt_score(r1)}</div>
       </div>
       <div class="us-top3-card">
         <div class="us-top3-rank">3. Platz</div>
+        <div style="font-size:1.8rem;margin-bottom:4px">&#x1F949;</div>
         <div class="us-top3-city">{r3['name']}</div>
         <div class="us-top3-state">{bl(r3)}</div>
         <div class="us-top3-score">{fmt_score(r3)}</div>
@@ -428,12 +412,12 @@ st.markdown(f"""
 <div style="display:flex;justify-content:space-between;align-items:baseline;
             padding:14px 0 8px 0;border-bottom:2px solid #111418;margin-bottom:6px">
   <div>
-    <span style="font-family:'Syne',sans-serif;font-size:1.35rem;font-weight:700;color:#111418">
+    <span style="font-family:'DM Serif Display',serif;font-size:1.35rem;color:#111418">
         {stadt_auswahl}</span>
     <span style="font-size:0.75rem;color:#a0aec0;margin-left:10px">{row.get('bundesland','')}</span>
   </div>
   <div style="text-align:right">
-    <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:700;color:#111418">{ps_txt}</div>
+    <div style="font-family:'DM Serif Display',serif;font-size:1.5rem;color:#111418">{ps_txt}</div>
     <div style="font-size:0.68rem;color:#a0aec0">{rang_v} &nbsp;·&nbsp; Profil: {aktive_persona}</div>
   </div>
 </div>
@@ -684,14 +668,92 @@ else:
     st.info(f"Keine Daten für '{kat}' vorhanden.")
 
 # ---------------------------------------------------------------
-# Karte
+# Karte — Städte als ausgefüllte Kreisflächen (approximiert)
 # ---------------------------------------------------------------
 
 st.markdown('<div class="us-section">Karte</div>', unsafe_allow_html=True)
-karte_df = df_sorted[["name", "latitude", "longitude", "personscore"]].copy()
-karte_df = karte_df.rename(columns={"latitude": "lat", "longitude": "lon"})
-karte_df["personscore"] = karte_df["personscore"].fillna(0)
-st.map(karte_df, latitude="lat", longitude="lon", size=40000, zoom=5)
+
+try:
+    import pydeck as pdk
+
+    karte_df = df_sorted[["name", "latitude", "longitude", "personscore", "bundesland"]].copy()
+    karte_df = karte_df.rename(columns={"latitude": "lat", "longitude": "lon"})
+    karte_df["personscore"] = karte_df["personscore"].fillna(0)
+
+    # Farbe: Grün (hoch) → Rot (niedrig) basierend auf Personscore
+    def score_to_rgb(s):
+        s = max(0.0, min(1.0, float(s)))
+        r = int((1 - s) * 200 + 30)
+        g = int(s * 180 + 40)
+        b = 80
+        return [r, g, b, 160]
+
+    karte_df["fill_color"] = karte_df["personscore"].apply(score_to_rgb)
+
+    # Radius proportional zum Score, Basisradius ~8km
+    karte_df["radius"] = karte_df["personscore"].apply(lambda s: int(6000 + float(s) * 8000))
+
+    layer = pdk.Layer(
+        "ScatterplotLayer",
+        data=karte_df,
+        get_position=["lon", "lat"],
+        get_fill_color="fill_color",
+        get_radius="radius",
+        pickable=True,
+        stroked=True,
+        get_line_color=[255, 255, 255, 80],
+        line_width_min_pixels=1,
+    )
+
+    text_layer = pdk.Layer(
+        "TextLayer",
+        data=karte_df,
+        get_position=["lon", "lat"],
+        get_text="name",
+        get_size=12,
+        get_color=[30, 30, 30, 220],
+        get_alignment_baseline="'bottom'",
+    )
+
+    view = pdk.ViewState(latitude=51.2, longitude=10.4, zoom=5.2, pitch=0)
+
+    tooltip = {
+        "html": "<b>{name}</b><br/>Score: {personscore:.2f}",
+        "style": {"background": "white", "color": "#111418",
+                  "font-family": "'DM Sans', sans-serif", "font-size": "12px",
+                  "padding": "8px 12px", "border-radius": "4px"},
+    }
+
+    st.pydeck_chart(pdk.Deck(
+        layers=[layer, text_layer],
+        initial_view_state=view,
+        tooltip=tooltip,
+        map_style="light",
+    ))
+
+    # Legende
+    st.markdown("""
+    <div style="display:flex;align-items:center;gap:16px;margin-top:6px;font-size:0.72rem;color:#718096">
+        <span>Score niedrig</span>
+        <div style="display:flex;gap:3px">
+            <div style="width:16px;height:10px;background:rgb(230,40,80);border-radius:2px;opacity:0.8"></div>
+            <div style="width:16px;height:10px;background:rgb(200,100,80);border-radius:2px;opacity:0.8"></div>
+            <div style="width:16px;height:10px;background:rgb(160,150,80);border-radius:2px;opacity:0.8"></div>
+            <div style="width:16px;height:10px;background:rgb(80,180,80);border-radius:2px;opacity:0.8"></div>
+            <div style="width:16px;height:10px;background:rgb(40,220,120);border-radius:2px;opacity:0.8"></div>
+        </div>
+        <span>Score hoch</span>
+        <span style="margin-left:12px;color:#a0aec0">Kreisradius proportional zum Score</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+except ImportError:
+    # Fallback: Standard st.map
+    karte_df = df_sorted[["name", "latitude", "longitude", "personscore"]].copy()
+    karte_df = karte_df.rename(columns={"latitude": "lat", "longitude": "lon"})
+    karte_df["personscore"] = karte_df["personscore"].fillna(0)
+    st.map(karte_df, latitude="lat", longitude="lon", size=40000, zoom=5)
+    st.caption("Für die farbige Karte: `pip install pydeck` ausführen.")
 
 # ---------------------------------------------------------------
 # Zeitreihe
