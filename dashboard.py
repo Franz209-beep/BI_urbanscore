@@ -1,10 +1,10 @@
 """
-UrbanScore Deutschland — Dashboard (Erweitert)
-===============================================
-Neu:
-- 4 neue Kategorien: Bildung, Gesundheit, Freizeit, Sicherheit
-- Personalisierung: Persona-Profile + individuelle Gewichtung
-- Korrelationsanalysen: 4 vordefinierte Paare mit Scatter-Plot
+UrbanScore Deutschland — Dashboard
+====================================
+- Professionelles minimalistisches Design ohne Emojis
+- Persona-Gewichte realistisch (Sicherheit > 0 überall)
+- Individuell: Gewichte werden auf 100% normiert (kein Overflow)
+- Detailansicht: Dimensionen untereinander mit Score-Zusammensetzung
 """
 
 import sqlite3
@@ -23,53 +23,87 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=Inter:wght@300;400;500&display=swap');
 
-html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-.header {
-    background: #0f1923;
-    border-radius: 16px;
-    padding: 2rem 2.5rem 1.8rem;
-    margin-bottom: 1.5rem;
-    overflow: hidden;
-    position: relative;
+.us-header {
+    background: #111418;
+    border-radius: 4px;
+    padding: 2.2rem 2.5rem 2rem;
+    margin-bottom: 1.8rem;
 }
-.header h1 { font-family: 'DM Serif Display', serif; font-size: 2.4rem; color: white; margin: 0 0 0.3rem 0; position: relative; z-index: 2; }
-.header p  { color: #7a9ab5; font-size: 0.95rem; margin: 0; font-weight: 300; position: relative; z-index: 2; }
-.skyline   { position: absolute; bottom: 0; right: 0; opacity: 0.12; z-index: 1; }
+.us-header h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: #f0f2f5;
+    margin: 0 0 0.25rem 0;
+    letter-spacing: -0.02em;
+}
+.us-header p { color: #4a5568; font-size: 0.82rem; margin: 0; }
 
-.stat { background: #f7f8fa; border-radius: 10px; padding: 1rem 1.2rem; text-align: center; }
-.stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1.2px; color: #8a9ab0; margin-bottom: 5px; }
-.stat-value { font-family: 'DM Serif Display', serif; font-size: 1.6rem; color: #0f1923; }
+.us-section {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #a0aec0;
+    margin: 2rem 0 0.9rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #f0f2f5;
+}
 
-.podest-wrap { display: flex; align-items: flex-end; gap: 12px; margin: 1.5rem 0; }
-.podest-card { flex: 1; background: white; border: 0.5px solid #e2e8f0; border-radius: 14px; padding: 1.2rem; text-align: center; }
-.podest-card.gold { border: 2px solid #f6ad55; }
-.podest-city { font-size: 1rem; font-weight: 500; color: #0f1923; }
-.podest-city.gold { font-size: 1.2rem; }
-.podest-state { font-size: 0.75rem; color: #9aabba; margin-top: 2px; }
-.podest-score { font-size: 0.85rem; color: #5a7a96; margin-top: 6px; }
+.us-top3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px;
+           background: #edf2f7; border: 1px solid #edf2f7; border-radius: 4px;
+           overflow: hidden; margin: 0.5rem 0 1.5rem 0; }
+.us-top3-card { background: white; padding: 1.4rem 1.2rem; text-align: center; }
+.us-top3-card.first { background: #fafafa; }
+.us-top3-rank { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.12em;
+                text-transform: uppercase; color: #a0aec0; margin-bottom: 0.5rem; }
+.us-top3-rank.first { color: #b7791f; }
+.us-top3-city { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 600; color: #111418; }
+.us-top3-card.first .us-top3-city { font-size: 1.25rem; }
+.us-top3-state { font-size: 0.72rem; color: #a0aec0; margin-top: 3px; }
+.us-top3-score { font-size: 0.78rem; color: #718096; margin-top: 8px; font-weight: 500; }
 
-.section-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1.5px; color: #9aabba; margin: 1.5rem 0 0.8rem 0; }
+.us-rank-row { display: flex; align-items: center; padding: 7px 0;
+               border-bottom: 1px solid #f7f8fa; font-size: 0.82rem; }
+.us-rank-num { width: 28px; color: #cbd5e0; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.us-rank-name { flex: 1; font-weight: 500; color: #111418; }
+.us-rank-state { font-size: 0.68rem; color: #cbd5e0; margin-left: 5px; font-weight: 400; }
+.us-rank-bars { display: flex; align-items: center; gap: 2px; margin: 0 10px; }
+.us-rank-score { width: 38px; text-align: right; font-weight: 500; color: #111418;
+                 font-size: 0.8rem; font-variant-numeric: tabular-nums; }
 
-.persona-card { border: 2px solid transparent; border-radius: 12px; padding: 10px 14px; cursor: pointer; background: #f7f8fa; text-align: center; transition: all 0.2s; }
-.persona-card.active { border-color: #378ADD; background: #ebf8ff; }
-.persona-emoji { font-size: 1.8rem; }
-.persona-label { font-size: 0.78rem; font-weight: 500; color: #0f1923; margin-top: 4px; }
+.us-weight-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; font-size: 0.75rem; }
+.us-weight-label { width: 90px; color: #4a5568; font-weight: 500; flex-shrink: 0; }
+.us-weight-bar-bg { flex: 1; background: #f0f2f5; border-radius: 2px; height: 6px; }
+.us-weight-bar-fill { height: 6px; border-radius: 2px; }
+.us-weight-pct { width: 34px; text-align: right; color: #a0aec0; font-variant-numeric: tabular-nums; }
 
-.detail-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
-.detail-kachel { background: #f7f8fa; border-radius: 10px; padding: 12px 14px; text-align: center; border-top: 3px solid transparent; }
-.detail-kachel-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px; color: #9aabba; margin-bottom: 6px; }
-.detail-kachel-val { font-family: 'DM Serif Display', serif; font-size: 1.5rem; color: #0f1923; }
-.detail-kachel-unit { font-size: 0.72rem; color: #b0bec8; margin-top: 2px; }
+.us-dim-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 220px 55px;
+    align-items: center;
+    gap: 14px;
+    padding: 11px 0;
+    border-bottom: 1px solid #f7f8fa;
+}
+.us-dim-label { font-size: 0.75rem; font-weight: 600; color: #2d3748; }
+.us-dim-gew { font-size: 0.65rem; color: #a0aec0; margin-top: 2px; }
+.us-dim-bar-bg { background: #f0f2f5; border-radius: 2px; height: 7px; }
+.us-dim-bar-fill { height: 7px; border-radius: 2px; }
+.us-dim-details { font-size: 0.69rem; color: #718096; line-height: 1.7; }
+.us-dim-score { font-family: 'Syne', sans-serif; font-size: 1.05rem;
+                font-weight: 700; color: #111418; text-align: right; }
 
-.corr-box { background: #f7f8fa; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
-.corr-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: #9aabba; margin-bottom: 4px; }
-.corr-value { font-family: 'DM Serif Display', serif; font-size: 1.4rem; }
-.corr-interp { font-size: 0.8rem; color: #7a9ab5; margin-top: 4px; }
-
-.info-pill { display: inline-block; font-size: 0.7rem; padding: 3px 10px; border-radius: 999px; margin-bottom: 1rem; background: #ebf8ff; color: #2c5282; }
+.us-corr-stat { background: #fafafa; border: 1px solid #edf2f7; border-radius: 4px;
+                padding: 1.2rem; margin-bottom: 0.8rem; }
+.us-corr-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+                 letter-spacing: 0.1em; color: #a0aec0; margin-bottom: 6px; }
+.us-corr-val { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 700; }
+.us-corr-desc { font-size: 0.75rem; color: #718096; margin-top: 4px; line-height: 1.5; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -80,25 +114,21 @@ html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
 @st.cache_data(ttl=3600)
 def lade_daten():
     try:
-        conn     = sqlite3.connect("urbanscore.db")
-        staedte  = pd.read_sql_query("SELECT * FROM stadt", conn)
-        zeit     = pd.read_sql_query("SELECT * FROM zeit ORDER BY jahr DESC", conn)
-        wetter   = pd.read_sql_query("SELECT * FROM wetterdaten", conn)
-        miete    = pd.read_sql_query("SELECT * FROM mietdaten", conn)
-        arbeit   = pd.read_sql_query("SELECT * FROM arbeitsmarktdaten", conn)
-        infra    = pd.read_sql_query("SELECT * FROM infrastruktur", conn)
-        ranking  = pd.read_sql_query("SELECT * FROM ranking", conn)
-
-        # Neue Tabellen (mit Fallback falls noch nicht vorhanden)
+        conn    = sqlite3.connect("urbanscore.db")
+        staedte = pd.read_sql_query("SELECT * FROM stadt", conn)
+        zeit    = pd.read_sql_query("SELECT * FROM zeit ORDER BY jahr DESC", conn)
+        wetter  = pd.read_sql_query("SELECT * FROM wetterdaten", conn)
+        miete   = pd.read_sql_query("SELECT * FROM mietdaten", conn)
+        arbeit  = pd.read_sql_query("SELECT * FROM arbeitsmarktdaten", conn)
+        infra   = pd.read_sql_query("SELECT * FROM infrastruktur", conn)
+        ranking = pd.read_sql_query("SELECT * FROM ranking", conn)
         def safe(q):
             try:    return pd.read_sql_query(q, conn)
             except: return pd.DataFrame()
-
         bildung    = safe("SELECT * FROM bildungsdaten")
         gesundheit = safe("SELECT * FROM gesundheitsdaten")
         freizeit   = safe("SELECT * FROM freizeitdaten")
         sicherheit = safe("SELECT * FROM sicherheitsdaten")
-
         conn.close()
         return staedte, zeit, wetter, miete, arbeit, infra, ranking, bildung, gesundheit, freizeit, sicherheit
     except Exception as e:
@@ -107,7 +137,6 @@ def lade_daten():
 
 (staedte, zeit, wetter, miete, arbeit, infra,
  ranking, bildung, gesundheit, freizeit, sicherheit) = lade_daten()
-
 if staedte is None:
     st.stop()
 
@@ -123,30 +152,11 @@ except:
     pass
 
 st.markdown(f"""
-<div class="header">
-  <svg class="skyline" width="420" height="120" viewBox="0 0 420 120" xmlns="http://www.w3.org/2000/svg">
-    <rect x="10"  y="60" width="18" height="60" fill="white"/>
-    <rect x="14"  y="50" width="10" height="12" fill="white"/>
-    <rect x="16"  y="40" width="6"  height="12" fill="white"/>
-    <rect x="35"  y="40" width="22" height="80" fill="white"/>
-    <rect x="41"  y="30" width="10" height="12" fill="white"/>
-    <rect x="63"  y="70" width="14" height="50" fill="white"/>
-    <rect x="83"  y="30" width="26" height="90" fill="white"/>
-    <rect x="87"  y="20" width="8"  height="12" fill="white"/>
-    <rect x="91"  y="10" width="2"  height="12" fill="white"/>
-    <rect x="115" y="55" width="20" height="65" fill="white"/>
-    <rect x="141" y="45" width="30" height="75" fill="white"/>
-    <rect x="148" y="35" width="16" height="12" fill="white"/>
-    <rect x="177" y="65" width="16" height="55" fill="white"/>
-    <rect x="199" y="35" width="24" height="85" fill="white"/>
-    <rect x="229" y="50" width="18" height="70" fill="white"/>
-    <rect x="253" y="40" width="28" height="80" fill="white"/>
-    <rect x="309" y="38" width="22" height="82" fill="white"/>
-    <rect x="361" y="42" width="26" height="78" fill="white"/>
-    <rect x="0"   y="118" width="420" height="4" fill="white"/>
-  </svg>
+<div class="us-header">
   <h1>UrbanScore Deutschland</h1>
-  <p>Klima · Wohnen · Wirtschaft · Infrastruktur · Bildung · Gesundheit · Freizeit · Sicherheit · Letzte Aktualisierung: {letzter_lauf}</p>
+  <p>Multidimensionales Städteranking &nbsp;·&nbsp;
+     Klima · Wohnen · Wirtschaft · Infrastruktur · Bildung · Gesundheit · Freizeit · Sicherheit
+     &nbsp;·&nbsp; Stand: {letzter_lauf}</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -166,24 +176,18 @@ zeit_id = int(zeit[zeit["zeitraum_label"] == zeitraum]["zeit_id"].values[0])
 def fz(df):
     return df[df["zeit_id"] == zeit_id] if not df.empty else pd.DataFrame()
 
-wetter_z    = fz(wetter)
-miete_z     = fz(miete)
-arbeit_z    = fz(arbeit)
-infra_z     = fz(infra)
-ranking_z   = fz(ranking)
-bildung_z   = fz(bildung)
-gesundheit_z = fz(gesundheit)
-freizeit_z  = fz(freizeit)
+wetter_z     = fz(wetter);    miete_z      = fz(miete)
+arbeit_z     = fz(arbeit);    infra_z      = fz(infra)
+ranking_z    = fz(ranking);   bildung_z    = fz(bildung)
+gesundheit_z = fz(gesundheit); freizeit_z  = fz(freizeit)
 sicherheit_z = fz(sicherheit)
 
-# Alles zusammenführen
 df = staedte.copy()
 for tab in [wetter_z, miete_z, arbeit_z, infra_z, ranking_z,
             bildung_z, gesundheit_z, freizeit_z, sicherheit_z]:
     if not tab.empty:
-        cols_to_drop = [c for c in tab.columns if c in df.columns and c != "stadt_id"]
-        tab_clean = tab.drop(columns=cols_to_drop)
-        df = df.merge(tab_clean, on="stadt_id", how="left")
+        drop = [c for c in tab.columns if c in df.columns and c != "stadt_id"]
+        df = df.merge(tab.drop(columns=drop), on="stadt_id", how="left")
 
 hat_ranking    = not ranking_z.empty
 hat_wetter     = not wetter_z.empty
@@ -196,132 +200,29 @@ hat_freizeit   = not freizeit_z.empty
 hat_sicherheit = not sicherheit_z.empty
 
 # ---------------------------------------------------------------
-# ═══════════════════════════════════════════════════════════════
-# PERSONALISIERUNG
-# Kombiniert: Persona-Profile + individuelle Schieberegler
-# ═══════════════════════════════════════════════════════════════
+# Konstanten
 # ---------------------------------------------------------------
-
-st.markdown('<div class="section-label">🎯 Mein Profil — Personalisiertes Ranking</div>', unsafe_allow_html=True)
-
-PERSONAS = {
-    "Familie":    {"emoji": "👨‍👩‍👧", "gewichte": {"Klima": 10, "Wohnen": 25, "Wirtschaft": 15, "Infrastruktur": 10, "Bildung": 25, "Gesundheit": 10, "Freizeit": 5, "Sicherheit": 0}},
-    "Freelancer": {"emoji": "💻", "gewichte": {"Klima": 15, "Wohnen": 20, "Wirtschaft": 20, "Infrastruktur": 20, "Bildung": 5,  "Gesundheit": 5,  "Freizeit": 15, "Sicherheit": 0}},
-    "Rentner":    {"emoji": "🌿", "gewichte": {"Klima": 20, "Wohnen": 25, "Wirtschaft": 5,  "Infrastruktur": 15, "Bildung": 0,  "Gesundheit": 25, "Freizeit": 10, "Sicherheit": 0}},
-    "Student":    {"emoji": "🎓", "gewichte": {"Klima": 10, "Wohnen": 30, "Wirtschaft": 10, "Infrastruktur": 20, "Bildung": 20, "Gesundheit": 5,  "Freizeit": 5,  "Sicherheit": 0}},
-    "Individuell":{"emoji": "⚙️", "gewichte": None},
-}
-
-# Persona-Auswahl
-persona_cols = st.columns(len(PERSONAS))
-if "aktive_persona" not in st.session_state:
-    st.session_state.aktive_persona = "Familie"
-
-for col, (name, info) in zip(persona_cols, PERSONAS.items()):
-    with col:
-        aktiv = st.session_state.aktive_persona == name
-        style = "background:#ebf8ff;border:2px solid #378ADD;" if aktiv else "background:#f7f8fa;border:2px solid transparent;"
-        if st.button(f"{info['emoji']}\n{name}", key=f"persona_{name}", use_container_width=True):
-            st.session_state.aktive_persona = name
-
-aktive_persona   = st.session_state.aktive_persona
-persona_gewichte = PERSONAS[aktive_persona]["gewichte"]
-
-# Schieberegler (bei Individuell immer editierbar, sonst vorbelegt)
-st.markdown("<div style='margin-top:0.8rem'></div>", unsafe_allow_html=True)
-slider_cols = st.columns(4)
 
 SCORE_MAP = {
     "Klima":         "score_klima",
     "Wohnen":        "score_wohnen",
     "Wirtschaft":    "score_wirtschaft",
     "Infrastruktur": "score_infrastruktur",
-    "Bildung":        "score_bildung",
-    "Gesundheit":     "score_gesundheit",
-    "Freizeit":       "score_freizeit",
-    "Sicherheit":     "score_sicherheit",
+    "Bildung":       "score_bildung",
+    "Gesundheit":    "score_gesundheit",
+    "Freizeit":      "score_freizeit",
+    "Sicherheit":    "score_sicherheit",
 }
 
-SLIDER_FARBEN = {
-    "Klima": "#5DCAA5", "Wohnen": "#378ADD", "Wirtschaft": "#EF9F27",
-    "Infrastruktur": "#D85A30", "Bildung": "#9B59B6", "Gesundheit": "#E74C3C",
-    "Freizeit": "#27AE60", "Sicherheit": "#2C3E50",
-}
-
-gewichte_user = {}
-slider_namen  = list(SCORE_MAP.keys())
-
-for idx, name in enumerate(slider_namen):
-    col = slider_cols[idx % 4]
-    with col:
-        vorwert = persona_gewichte[name] if (persona_gewichte and aktive_persona != "Individuell") else 10
-        disabled = (aktive_persona != "Individuell") and (persona_gewichte is not None)
-        val = st.slider(
-            name,
-            min_value=0, max_value=40,
-            value=vorwert,
-            disabled=disabled,
-            key=f"slider_{name}_{aktive_persona}",
-        )
-        gewichte_user[name] = val
-
-gesamt_gewicht = sum(gewichte_user.values())
-if gesamt_gewicht == 0:
-    gesamt_gewicht = 1
-
-# Personalisierten Score berechnen
-def berechne_personscore(row):
-    total = 0.0
-    for name, col in SCORE_MAP.items():
-        v = row.get(col)
-        if pd.notna(v):
-            total += float(v) * (gewichte_user[name] / gesamt_gewicht)
-    return total
-
-if hat_ranking:
-    df["personscore"] = df.apply(berechne_personscore, axis=1)
-    df_person = df.sort_values("personscore", ascending=False).reset_index(drop=True)
-    df_person["person_rang"] = range(1, len(df_person) + 1)
-else:
-    df_person = df.copy()
-    df_person["person_rang"] = range(1, len(df_person) + 1)
-
-# Personalisiertes Podest
-st.markdown(f'<div class="section-label">Ergebnis für Profil: {PERSONAS[aktive_persona]["emoji"]} {aktive_persona}</div>', unsafe_allow_html=True)
-
-top3p = df_person.head(3)
-if len(top3p) >= 3:
-    pod_html = '<div class="podest-wrap">'
-    def pscore(r):
-        s = r.get("personscore")
-        return f"{int(float(s)*100)} Punkte" if pd.notna(s) else "—"
-
-    r2 = top3p.iloc[1]
-    pod_html += f'<div class="podest-card" style="margin-top:40px"><div style="font-size:32px;margin-bottom:6px">🥈</div><div class="podest-city">{r2["name"]}</div><div class="podest-state">{r2["bundesland"]}</div><div class="podest-score">{pscore(r2)}</div></div>'
-    r1 = top3p.iloc[0]
-    pod_html += f'<div class="podest-card gold" style="margin-top:0px"><div style="font-size:40px;margin-bottom:6px">🥇</div><div class="podest-city gold">{r1["name"]}</div><div class="podest-state">{r1["bundesland"]}</div><div class="podest-score">{pscore(r1)}</div></div>'
-    r3 = top3p.iloc[2]
-    pod_html += f'<div class="podest-card" style="margin-top:60px"><div style="font-size:28px;margin-bottom:6px">🥉</div><div class="podest-city">{r3["name"]}</div><div class="podest-state">{r3["bundesland"]}</div><div class="podest-score">{pscore(r3)}</div></div>'
-    pod_html += '</div>'
-    st.markdown(pod_html, unsafe_allow_html=True)
-
-# ---------------------------------------------------------------
-# Gesamtranking (Standard)
-# ---------------------------------------------------------------
-
-df_sorted = df_person  # Für den Rest des Dashboards nach Personscore sortieren
-
-st.markdown('<div class="section-label">Gesamtranking</div>', unsafe_allow_html=True)
-
-FARBEN = {
-    "score_klima":         "#5DCAA5",
-    "score_wohnen":        "#378ADD",
-    "score_wirtschaft":    "#EF9F27",
-    "score_infrastruktur": "#D85A30",
-    "score_bildung":       "#9B59B6",
-    "score_gesundheit":    "#E74C3C",
-    "score_freizeit":      "#27AE60",
-    "score_sicherheit":    "#2C3E50",
+DIM_FARBEN = {
+    "Klima":         "#4A9B84",
+    "Wohnen":        "#3B7EC8",
+    "Wirtschaft":    "#C8891F",
+    "Infrastruktur": "#B84C2A",
+    "Bildung":       "#7B52AB",
+    "Gesundheit":    "#C0392B",
+    "Freizeit":      "#27855A",
+    "Sicherheit":    "#2C3E50",
 }
 
 BL = {"Nordrhein-Westfalen":"NW","Bayern":"BY","Baden-Württemberg":"BW",
@@ -330,226 +231,434 @@ BL = {"Nordrhein-Westfalen":"NW","Bayern":"BY","Baden-Württemberg":"BW",
       "Sachsen-Anhalt":"ST","Rheinland-Pfalz":"RP","Saarland":"SL",
       "Schleswig-Holstein":"SH","Mecklenburg-Vorpommern":"MV"}
 
-def ranking_zeile(row):
-    rang      = int(row.get("person_rang", 0))
-    score     = row.get("personscore") if hat_ranking else None
-    score_txt = f"{int(float(score)*100)}%" if pd.notna(score) else "—"
-    bars = ""
-    for col, farbe in FARBEN.items():
-        v = row.get(col)
-        w = max(3, int(float(v) * 30)) if pd.notna(v) else 3
-        bars += f'<div style="width:{w}px;height:12px;border-radius:3px;background:{farbe};opacity:0.85;display:inline-block;margin-right:2px"></div>'
-    bl_kuerzel = BL.get(row["bundesland"], row["bundesland"][:2].upper())
-    return f"""<div style="display:flex;align-items:center;padding:7px 10px;
-        border-bottom:0.5px solid #f3f5f7;font-size:0.88rem;">
-        <div style="width:28px;color:#c0cdd8;font-size:0.8rem">{rang}</div>
-        <div style="flex:1;font-weight:500;color:#0f1923">{row['name']}
-            <span style="font-size:0.72rem;color:#b0bec8;margin-left:4px">{bl_kuerzel}</span>
-        </div>
-        <div style="display:flex;align-items:center;margin-right:10px">{bars}</div>
-        <div style="font-weight:500;color:#0f1923;width:36px;text-align:right">{score_txt}</div>
-    </div>"""
-
-col_links, col_rechts = st.columns(2)
-with col_links:
-    for _, row in df_sorted.iloc[:10].iterrows():
-        st.markdown(ranking_zeile(row), unsafe_allow_html=True)
-with col_rechts:
-    for _, row in df_sorted.iloc[10:].iterrows():
-        st.markdown(ranking_zeile(row), unsafe_allow_html=True)
-
-# Legende (alle 8 Kategorien)
-legend_items = [
-    ("#5DCAA5","Klima"), ("#378ADD","Wohnen"), ("#EF9F27","Wirtschaft"),
-    ("#D85A30","Infra"), ("#9B59B6","Bildung"), ("#E74C3C","Gesundheit"),
-    ("#27AE60","Freizeit"), ("#2C3E50","Sicherheit"),
-]
-legend_html = '<div style="display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;">'
-for farbe, label in legend_items:
-    legend_html += f'<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#9aabba"><span style="width:10px;height:10px;border-radius:2px;background:{farbe};display:inline-block"></span>{label}</span>'
-legend_html += '</div>'
-st.markdown(legend_html, unsafe_allow_html=True)
-
 # ---------------------------------------------------------------
-# ═══════════════════════════════════════════════════════════════
-# KORRELATIONSANALYSEN
-# ═══════════════════════════════════════════════════════════════
+# PERSONALISIERUNG
+# Sicherheit überall > 0; alle Personas summieren auf 100
 # ---------------------------------------------------------------
 
-st.markdown('<div class="section-label">📊 Korrelationsanalysen</div>', unsafe_allow_html=True)
+st.markdown('<div class="us-section">Profil</div>', unsafe_allow_html=True)
 
-KORRELATIONEN = {
-    "Miete vs. Lebensqualität": {
-        "x": "mietpreis_kalt_qm",
-        "y": "gesamtscore",
-        "x_label": "Kaltmiete (€/m²)",
-        "y_label": "Gesamtscore",
-        "beschreibung": "Zahlt man in teureren Städten wirklich für mehr Lebensqualität?",
-        "farbe": "#378ADD",
+PERSONAS = {
+    "Familie": {
+        "beschreibung": "Fokus auf Bildung, Wohnen und Sicherheit",
+        "gewichte": {"Klima": 8, "Wohnen": 22, "Wirtschaft": 13,
+                     "Infrastruktur": 10, "Bildung": 22, "Gesundheit": 10,
+                     "Freizeit": 5,  "Sicherheit": 10},
     },
-    "Arbeitslosigkeit vs. Kriminalität": {
-        "x": "arbeitslosenquote",
-        "y": "straftaten_je_100k",
-        "x_label": "Arbeitslosenquote (%)",
-        "y_label": "Straftaten je 100.000 EW",
-        "beschreibung": "Besteht ein Zusammenhang zwischen wirtschaftlicher Not und Kriminalität?",
-        "farbe": "#D85A30",
+    "Freelancer": {
+        "beschreibung": "Infrastruktur, Wirtschaft und Freizeit im Vordergrund",
+        "gewichte": {"Klima": 12, "Wohnen": 18, "Wirtschaft": 18,
+                     "Infrastruktur": 20, "Bildung": 5, "Gesundheit": 7,
+                     "Freizeit": 12, "Sicherheit": 8},
     },
-    "Infrastruktur vs. Mietpreis": {
-        "x": "poi_dichte",
-        "y": "mietpreis_kalt_qm",
-        "x_label": "POI-Dichte (POIs/km²)",
-        "y_label": "Kaltmiete (€/m²)",
-        "beschreibung": "Treibt bessere Infrastruktur die Mietpreise nach oben?",
-        "farbe": "#EF9F27",
+    "Rentner": {
+        "beschreibung": "Klima, Gesundheit und ruhiges Wohnen",
+        "gewichte": {"Klima": 18, "Wohnen": 22, "Wirtschaft": 5,
+                     "Infrastruktur": 12, "Bildung": 3, "Gesundheit": 22,
+                     "Freizeit": 8,  "Sicherheit": 10},
     },
-    "Klima vs. Zufriedenheit": {
-        "x": "sonnenstunden_jahr",
-        "y": "gesamtscore",
-        "x_label": "Sonnenstunden / Jahr",
-        "y_label": "Gesamtscore",
-        "beschreibung": "Profitieren sonnige Städte beim Gesamtranking?",
-        "farbe": "#5DCAA5",
+    "Student": {
+        "beschreibung": "Günstiges Wohnen, Bildung und ÖPNV",
+        "gewichte": {"Klima": 8, "Wohnen": 28, "Wirtschaft": 10,
+                     "Infrastruktur": 18, "Bildung": 20, "Gesundheit": 5,
+                     "Freizeit": 5,  "Sicherheit": 6},
+    },
+    "Individuell": {
+        "beschreibung": "Eigene Gewichtung — Summe wird automatisch auf 100% normiert",
+        "gewichte": None,
     },
 }
 
-def korrelation_berechnen(df, x_col, y_col):
-    """Pearson-Korrelation mit Interpretation."""
-    sub = df[[x_col, y_col]].dropna()
-    if len(sub) < 4:
-        return None, "Zu wenig Daten", "#9aabba"
-    r = float(np.corrcoef(sub[x_col], sub[y_col])[0, 1])
-    abs_r = abs(r)
-    if abs_r >= 0.7:
-        staerke = "stark"
-    elif abs_r >= 0.4:
-        staerke = "moderat"
-    else:
-        staerke = "schwach"
-    richtung = "positiv" if r > 0 else "negativ"
-    interp = f"{staerke} {richtung}er Zusammenhang"
-    farbe = "#276749" if abs_r >= 0.7 else ("#744210" if abs_r >= 0.4 else "#2a4365")
-    return round(r, 3), interp, farbe
+if "aktive_persona" not in st.session_state:
+    st.session_state.aktive_persona = "Familie"
 
-kat_auswahl = st.selectbox(
-    "Korrelation wählen",
-    list(KORRELATIONEN.keys()),
-    label_visibility="collapsed",
-)
-kdef = KORRELATIONEN[kat_auswahl]
-x_col, y_col = kdef["x"], kdef["y"]
+pcols = st.columns(len(PERSONAS))
+for col, name in zip(pcols, PERSONAS.keys()):
+    with col:
+        aktiv = st.session_state.aktive_persona == name
+        if st.button(name, key=f"pb_{name}", use_container_width=True,
+                     type="primary" if aktiv else "secondary"):
+            st.session_state.aktive_persona = name
+            st.rerun()
 
-col_info, col_chart = st.columns([1, 3])
+aktive_persona   = st.session_state.aktive_persona
+persona_gewichte = PERSONAS[aktive_persona]["gewichte"]
+st.caption(PERSONAS[aktive_persona]["beschreibung"])
 
-with col_info:
-    r_val, interp, r_farbe = korrelation_berechnen(df, x_col, y_col)
-    r_txt = f"{r_val:.3f}" if r_val is not None else "—"
+# Gewichte bestimmen
+if aktive_persona == "Individuell":
+    st.markdown("<div style='margin-top:0.8rem'></div>", unsafe_allow_html=True)
+    sl_cols = st.columns(4)
+    raw = {}
+    for idx, name in enumerate(SCORE_MAP.keys()):
+        with sl_cols[idx % 4]:
+            raw[name] = st.slider(name, 0, 40, 10, key=f"sl_{name}")
+    # Normieren auf 100 — kein Overflow möglich
+    gesamt_raw = sum(raw.values()) or 1
+    gewichte_user = {k: round(v / gesamt_raw * 100, 1) for k, v in raw.items()}
+else:
+    gewichte_user = {k: float(v) for k, v in persona_gewichte.items()}
+
+# Gewichtsbalken anzeigen
+st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
+bar_html = ""
+for name, pct in gewichte_user.items():
+    farbe = DIM_FARBEN[name]
+    bar_html += f"""<div class="us-weight-row">
+        <div class="us-weight-label">{name}</div>
+        <div class="us-weight-bar-bg">
+          <div class="us-weight-bar-fill" style="width:{pct}%;background:{farbe}"></div>
+        </div>
+        <div class="us-weight-pct">{pct:.0f}%</div>
+    </div>"""
+st.markdown(bar_html, unsafe_allow_html=True)
+
+# Personscore (immer 0–1, normiert)
+gesamt_gewicht = sum(gewichte_user.values()) or 1
+
+def berechne_personscore(row):
+    total = 0.0
+    for dim, col in SCORE_MAP.items():
+        v = row.get(col)
+        if pd.notna(v):
+            total += float(v) * (gewichte_user[dim] / gesamt_gewicht)
+    return total
+
+if hat_ranking:
+    df["personscore"] = df.apply(berechne_personscore, axis=1)
+else:
+    df["personscore"] = np.nan
+
+df_sorted = df.sort_values("personscore", ascending=False, na_position="last").reset_index(drop=True)
+df_sorted["person_rang"] = range(1, len(df_sorted) + 1)
+
+# ---------------------------------------------------------------
+# Top 3
+# ---------------------------------------------------------------
+
+st.markdown(f'<div class="us-section">Top 3 — {aktive_persona}</div>', unsafe_allow_html=True)
+
+def fmt_score(r, col="personscore"):
+    v = r.get(col)
+    return f"{float(v)*100:.1f} Pkt." if pd.notna(v) else "—"
+
+if len(df_sorted) >= 3:
+    r1, r2, r3 = df_sorted.iloc[0], df_sorted.iloc[1], df_sorted.iloc[2]
+    bl = lambda r: BL.get(r["bundesland"], r["bundesland"][:2].upper())
     st.markdown(f"""
-    <div class="corr-box">
-        <div class="corr-label">Pearson r</div>
-        <div class="corr-value" style="color:{r_farbe}">{r_txt}</div>
-        <div class="corr-interp">{interp}</div>
-    </div>
-    <div style="font-size:0.82rem;color:#5a7a96;line-height:1.5;margin-top:8px">
-        {kdef['beschreibung']}
+    <div class="us-top3">
+      <div class="us-top3-card">
+        <div class="us-top3-rank">2. Platz</div>
+        <div class="us-top3-city">{r2['name']}</div>
+        <div class="us-top3-state">{bl(r2)}</div>
+        <div class="us-top3-score">{fmt_score(r2)}</div>
+      </div>
+      <div class="us-top3-card first">
+        <div class="us-top3-rank first">1. Platz</div>
+        <div class="us-top3-city">{r1['name']}</div>
+        <div class="us-top3-state">{bl(r1)}</div>
+        <div class="us-top3-score">{fmt_score(r1)}</div>
+      </div>
+      <div class="us-top3-card">
+        <div class="us-top3-rank">3. Platz</div>
+        <div class="us-top3-city">{r3['name']}</div>
+        <div class="us-top3-state">{bl(r3)}</div>
+        <div class="us-top3-score">{fmt_score(r3)}</div>
+      </div>
     </div>
     """, unsafe_allow_html=True)
 
-with col_chart:
-    if x_col in df.columns and y_col in df.columns and df[x_col].notna().any():
-        scatter_df = df[["name", x_col, y_col]].dropna()
-        chart = alt.Chart(scatter_df).mark_circle(size=90, opacity=0.8).encode(
-            x=alt.X(f"{x_col}:Q", title=kdef["x_label"]),
-            y=alt.Y(f"{y_col}:Q", title=kdef["y_label"]),
-            color=alt.value(kdef["farbe"]),
-            tooltip=["name:N",
-                     alt.Tooltip(f"{x_col}:Q", title=kdef["x_label"], format=".2f"),
-                     alt.Tooltip(f"{y_col}:Q", title=kdef["y_label"], format=".2f")],
-        )
-        # Trendlinie
-        trend = chart.transform_regression(x_col, y_col).mark_line(
-            opacity=0.4, strokeDash=[6, 4], color=kdef["farbe"]
-        )
-        labels = chart.mark_text(dy=-10, fontSize=10, color="#0f1923").encode(
-            text="name:N"
-        )
-        final = (chart + trend + labels).properties(height=320).configure_axis(
-            grid=False, labelFontSize=11
-        ).configure_view(strokeWidth=0)
-        st.altair_chart(final, use_container_width=True)
-    else:
-        st.info(f"Keine ausreichenden Daten für diese Korrelation.")
-
 # ---------------------------------------------------------------
-# Detailansicht (erweitert auf 12 Kacheln)
+# Gesamtranking
 # ---------------------------------------------------------------
 
-st.markdown('<div class="section-label">Detailansicht</div>', unsafe_allow_html=True)
+st.markdown('<div class="us-section">Gesamtranking</div>', unsafe_allow_html=True)
 
-stadt_auswahl = st.selectbox("Stadt", df_sorted["name"].tolist(), label_visibility="collapsed")
-row = df_sorted[df_sorted["name"] == stadt_auswahl].iloc[0]
-
-def kachel(label, wert, einheit, farbe):
-    return f"""<div class="detail-kachel" style="border-top-color:{farbe}">
-        <div class="detail-kachel-label">{label}</div>
-        <div class="detail-kachel-val">{wert}</div>
-        <div class="detail-kachel-unit">{einheit}</div>
+def ranking_zeile(row):
+    rang      = int(row.get("person_rang", 0))
+    score_v   = row.get("personscore")
+    score_txt = f"{float(score_v)*100:.1f}" if pd.notna(score_v) else "—"
+    bars = ""
+    for dim, col in SCORE_MAP.items():
+        v = row.get(col)
+        w = max(2, int(float(v) * 28)) if pd.notna(v) else 2
+        bars += f'<div style="width:{w}px;height:10px;border-radius:1px;background:{DIM_FARBEN[dim]};opacity:0.8"></div>'
+    bl_k = BL.get(row["bundesland"], row["bundesland"][:2].upper())
+    return f"""<div class="us-rank-row">
+        <div class="us-rank-num">{rang}</div>
+        <div class="us-rank-name">{row['name']}
+            <span class="us-rank-state">{bl_k}</span></div>
+        <div class="us-rank-bars">{bars}</div>
+        <div class="us-rank-score">{score_txt}</div>
     </div>"""
+
+col_l, col_r = st.columns(2)
+with col_l:
+    for _, row in df_sorted.iloc[:10].iterrows():
+        st.markdown(ranking_zeile(row), unsafe_allow_html=True)
+with col_r:
+    for _, row in df_sorted.iloc[10:].iterrows():
+        st.markdown(ranking_zeile(row), unsafe_allow_html=True)
+
+leg = '<div style="display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;">'
+for dim, farbe in DIM_FARBEN.items():
+    leg += f'<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:#a0aec0"><span style="width:8px;height:8px;background:{farbe};display:inline-block;border-radius:1px"></span>{dim}</span>'
+leg += '</div>'
+st.markdown(leg, unsafe_allow_html=True)
+
+# ---------------------------------------------------------------
+# DETAILANSICHT — alle Dimensionen untereinander
+# ---------------------------------------------------------------
+
+st.markdown('<div class="us-section">Detailansicht</div>', unsafe_allow_html=True)
+
+stadt_auswahl = st.selectbox("Stadt wählen", df_sorted["name"].tolist(),
+                              label_visibility="collapsed")
+row = df_sorted[df_sorted["name"] == stadt_auswahl].iloc[0]
 
 def val(r, col, fmt="{:.1f}", fallback="—"):
     v = r.get(col)
     return fmt.format(float(v)) if pd.notna(v) else fallback
 
-rang_v  = f"#{int(row['person_rang'])}" if pd.notna(row.get("person_rang")) else "—"
-score_v = f"{int(float(row['personscore'])*100)}%" if pd.notna(row.get("personscore")) else "—"
+rang_v = f"Rang {int(row['person_rang'])} von {len(staedte)}"
+ps     = row.get("personscore")
+ps_txt = f"{float(ps)*100:.1f} Punkte" if pd.notna(ps) else "—"
 
-detail = '<div class="detail-grid">'
-# Zeile 1: Allgemein
-detail += kachel("Rang (Profil)", rang_v, f"von {len(staedte)} Städten", "#0f3460")
-detail += kachel("Personscore",   score_v, aktive_persona, "#e94560")
-detail += kachel("Sonnenstunden", val(row,"sonnenstunden_jahr","{:.0f}"), "h / Jahr", "#5DCAA5")
-detail += kachel("Temperatur",    val(row,"durchschnittstemperatur"), "°C", "#5DCAA5")
-# Zeile 2: Wohnen & Wirtschaft
-detail += kachel("Kaltmiete",        val(row,"mietpreis_kalt_qm","{:.2f}"), "€/m²",    "#378ADD")
-detail += kachel("Arbeitslosigkeit", val(row,"arbeitslosenquote"),          "%",        "#EF9F27")
-detail += kachel("Haltestellen",     val(row,"haltestellen_anzahl","{:.0f}"), "im Stadtgebiet", "#D85A30")
-detail += kachel("POI-Dichte",       val(row,"poi_dichte"), "POIs/km²",                "#D85A30")
-# Zeile 3: Neue Kategorien
-detail += kachel("Schulen+Kitas",    val(row,"schulen_anzahl","{:.0f}"), "+ " + val(row,"kitas_anzahl","{:.0f}"),  "#9B59B6")
-detail += kachel("Bildungsdichte",   val(row,"bildungs_dichte","{:.2f}"), "Einricht./km²",                         "#9B59B6")
-detail += kachel("Ärzte+Apotheken",  val(row,"aerzte_anzahl","{:.0f}"),  "+ " + val(row,"apotheken_anzahl","{:.0f}"), "#E74C3C")
-detail += kachel("Gesundheitsdichte",val(row,"gesundheits_dichte","{:.2f}"), "Einricht./km²",                      "#E74C3C")
-detail += kachel("Parks",            val(row,"parks_anzahl","{:.0f}"),   "im Stadtgebiet",                         "#27AE60")
-detail += kachel("Kulturdichte",     val(row,"kultur_anzahl","{:.0f}"),  "Museen+Theater+Kino",                    "#27AE60")
-detail += kachel("Straftaten",       val(row,"straftaten_je_100k","{:.0f}"), "je 100.000 EW",                      "#2C3E50")
-detail += kachel("Gewaltdelikte",    val(row,"gewaltdelikte_je_100k","{:.0f}"), "je 100.000 EW",                   "#2C3E50")
-detail += '</div>'
-st.markdown(detail, unsafe_allow_html=True)
+st.markdown(f"""
+<div style="display:flex;justify-content:space-between;align-items:baseline;
+            padding:14px 0 8px 0;border-bottom:2px solid #111418;margin-bottom:6px">
+  <div>
+    <span style="font-family:'Syne',sans-serif;font-size:1.35rem;font-weight:700;color:#111418">
+        {stadt_auswahl}</span>
+    <span style="font-size:0.75rem;color:#a0aec0;margin-left:10px">{row.get('bundesland','')}</span>
+  </div>
+  <div style="text-align:right">
+    <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:700;color:#111418">{ps_txt}</div>
+    <div style="font-size:0.68rem;color:#a0aec0">{rang_v} &nbsp;·&nbsp; Profil: {aktive_persona}</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Spalten-Header
+st.markdown("""
+<div style="display:grid;grid-template-columns:110px 1fr 220px 55px;gap:14px;
+            padding:5px 0 5px 0;font-size:0.6rem;font-weight:600;text-transform:uppercase;
+            letter-spacing:0.1em;color:#a0aec0;border-bottom:1px solid #edf2f7;margin-bottom:2px">
+  <div>Dimension</div><div>Score (0–100)</div><div>Rohdaten</div><div style="text-align:right">Wert</div>
+</div>
+""", unsafe_allow_html=True)
+
+DIMENSIONEN = [
+    {
+        "key": "Klima", "score_col": "score_klima",
+        "roh": [
+            ("Sonnenstunden/Jahr", val(row, "sonnenstunden_jahr", "{:.0f}"), "h"),
+            ("Ø Temperatur",       val(row, "durchschnittstemperatur", "{:.1f}"), "°C"),
+            ("Ø Niederschlag",     val(row, "niederschlag_avg", "{:.1f}"), "mm/Tag"),
+        ],
+    },
+    {
+        "key": "Wohnen", "score_col": "score_wohnen",
+        "roh": [
+            ("Kaltmiete", val(row, "mietpreis_kalt_qm", "{:.2f}"), "€/m²"),
+        ],
+    },
+    {
+        "key": "Wirtschaft", "score_col": "score_wirtschaft",
+        "roh": [
+            ("Arbeitslosenquote", val(row, "arbeitslosenquote", "{:.1f}"), "%"),
+        ],
+    },
+    {
+        "key": "Infrastruktur", "score_col": "score_infrastruktur",
+        "roh": [
+            ("Haltestellen", val(row, "haltestellen_anzahl", "{:.0f}"), "Stk."),
+            ("POI-Dichte",   val(row, "poi_dichte", "{:.1f}"), "/km²"),
+        ],
+    },
+    {
+        "key": "Bildung", "score_col": "score_bildung",
+        "roh": [
+            ("Schulen",          val(row, "schulen_anzahl", "{:.0f}"), "Stk."),
+            ("Kitas",            val(row, "kitas_anzahl", "{:.0f}"), "Stk."),
+            ("Unis/Hochschulen", val(row, "unis_anzahl", "{:.0f}"), "Stk."),
+            ("Dichte",           val(row, "bildungs_dichte", "{:.2f}"), "/km²"),
+            ("je 100k EW",       val(row, "bildung_pro_100k", "{:.1f}"), "Einr."),
+        ],
+    },
+    {
+        "key": "Gesundheit", "score_col": "score_gesundheit",
+        "roh": [
+            ("Arztpraxen",     val(row, "aerzte_anzahl", "{:.0f}"), "Stk."),
+            ("Krankenhäuser",  val(row, "krankenhaeuser_anzahl", "{:.0f}"), "Stk."),
+            ("Apotheken",      val(row, "apotheken_anzahl", "{:.0f}"), "Stk."),
+            ("Dichte",         val(row, "gesundheits_dichte", "{:.2f}"), "/km²"),
+            ("je 100k EW",     val(row, "gesundheit_pro_100k", "{:.1f}"), "Einr."),
+        ],
+    },
+    {
+        "key": "Freizeit", "score_col": "score_freizeit",
+        "roh": [
+            ("Parks",      val(row, "parks_anzahl", "{:.0f}"), "Stk."),
+            ("Kultur",     val(row, "kultur_anzahl", "{:.0f}"), "Einr."),
+            ("Sport",      val(row, "sport_anzahl", "{:.0f}"), "Einr."),
+            ("Dichte",     val(row, "freizeit_dichte", "{:.2f}"), "/km²"),
+            ("je 100k EW", val(row, "freizeit_pro_100k", "{:.1f}"), "Einr."),
+        ],
+    },
+    {
+        "key": "Sicherheit", "score_col": "score_sicherheit",
+        "roh": [
+            ("Straftaten",    val(row, "straftaten_je_100k", "{:.0f}"), "je 100k EW"),
+            ("Gewaltdelikte", val(row, "gewaltdelikte_je_100k", "{:.0f}"), "je 100k EW"),
+        ],
+    },
+]
+
+for dim in DIMENSIONEN:
+    farbe   = DIM_FARBEN[dim["key"]]
+    gewicht = gewichte_user.get(dim["key"], 0)
+    s_val   = row.get(dim["score_col"])
+    s_pct   = float(s_val) * 100 if pd.notna(s_val) else 0
+    s_txt   = f"{s_pct:.0f}" if pd.notna(s_val) else "—"
+    bar_w   = max(0, min(100, s_pct))
+
+    roh_lines = "".join(
+        f"<div><span style='color:#a0aec0'>{label}:</span> <b style='color:#2d3748'>{wert}</b> <span style='color:#cbd5e0'>{einheit}</span></div>"
+        for label, wert, einheit in dim["roh"]
+    )
+
+    st.markdown(f"""
+    <div class="us-dim-row">
+      <div>
+        <div class="us-dim-label">{dim['key']}</div>
+        <div class="us-dim-gew">Gewicht: {gewicht:.0f}%</div>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;
+                    font-size:0.65rem;color:#a0aec0;margin-bottom:4px">
+          <span>0</span><span>50</span><span>100</span>
+        </div>
+        <div class="us-dim-bar-bg">
+          <div class="us-dim-bar-fill" style="width:{bar_w}%;background:{farbe}"></div>
+        </div>
+      </div>
+      <div class="us-dim-details">{roh_lines}</div>
+      <div class="us-dim-score">{s_txt}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------
-# Städtevergleich (Balkendiagramm)
+# Korrelationsanalysen
 # ---------------------------------------------------------------
 
-st.markdown('<div class="section-label">Städtevergleich</div>', unsafe_allow_html=True)
+st.markdown('<div class="us-section">Korrelationsanalysen</div>', unsafe_allow_html=True)
+
+KORRELATIONEN = {
+    "Miete vs. Lebensqualität": {
+        "x": "mietpreis_kalt_qm", "y": "gesamtscore",
+        "x_label": "Kaltmiete (€/m²)", "y_label": "Gesamtscore",
+        "beschreibung": "Zahlt man in teureren Städten wirklich für mehr Lebensqualität?",
+        "farbe": "#3B7EC8",
+    },
+    "Arbeitslosigkeit vs. Kriminalität": {
+        "x": "arbeitslosenquote", "y": "straftaten_je_100k",
+        "x_label": "Arbeitslosenquote (%)", "y_label": "Straftaten je 100.000 EW",
+        "beschreibung": "Besteht ein Zusammenhang zwischen wirtschaftlicher Not und Kriminalität?",
+        "farbe": "#B84C2A",
+    },
+    "Infrastruktur vs. Mietpreis": {
+        "x": "poi_dichte", "y": "mietpreis_kalt_qm",
+        "x_label": "POI-Dichte (POIs/km²)", "y_label": "Kaltmiete (€/m²)",
+        "beschreibung": "Treibt bessere Infrastruktur die Mietpreise nach oben?",
+        "farbe": "#C8891F",
+    },
+    "Klima vs. Gesamtscore": {
+        "x": "sonnenstunden_jahr", "y": "gesamtscore",
+        "x_label": "Sonnenstunden / Jahr", "y_label": "Gesamtscore",
+        "beschreibung": "Profitieren sonnige Städte beim Gesamtranking?",
+        "farbe": "#4A9B84",
+    },
+}
+
+def pearson(df, x, y):
+    sub = df[[x, y]].dropna()
+    if len(sub) < 4:
+        return None, "Zu wenig Daten"
+    r  = float(np.corrcoef(sub[x], sub[y])[0, 1])
+    st = "stark" if abs(r) >= 0.7 else ("moderat" if abs(r) >= 0.4 else "schwach")
+    ri = "positiv" if r > 0 else "negativ"
+    return round(r, 3), f"{st} {ri}"
+
+kat_auswahl = st.selectbox("Korrelation", list(KORRELATIONEN.keys()),
+                            label_visibility="collapsed")
+kdef  = KORRELATIONEN[kat_auswahl]
+x_col, y_col = kdef["x"], kdef["y"]
+
+col_info, col_chart = st.columns([1, 3])
+with col_info:
+    r_val, interp = pearson(df, x_col, y_col)
+    r_txt   = f"{r_val:+.3f}" if r_val is not None else "—"
+    r_color = "#111418" if r_val is None else ("#276749" if abs(r_val) >= 0.5 else "#744210")
+    st.markdown(f"""
+    <div class="us-corr-stat">
+        <div class="us-corr-label">Pearson r</div>
+        <div class="us-corr-val" style="color:{r_color}">{r_txt}</div>
+        <div class="us-corr-desc">{interp}</div>
+    </div>
+    <div class="us-corr-stat">
+        <div class="us-corr-label">Fragestellung</div>
+        <div class="us-corr-desc">{kdef['beschreibung']}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col_chart:
+    if x_col in df.columns and y_col in df.columns and df[x_col].notna().any():
+        sdf = df[["name", x_col, y_col]].dropna()
+        pts = alt.Chart(sdf).mark_circle(size=80, opacity=0.85, color=kdef["farbe"]).encode(
+            x=alt.X(f"{x_col}:Q", title=kdef["x_label"]),
+            y=alt.Y(f"{y_col}:Q", title=kdef["y_label"]),
+            tooltip=["name:N",
+                     alt.Tooltip(f"{x_col}:Q", title=kdef["x_label"], format=".2f"),
+                     alt.Tooltip(f"{y_col}:Q", title=kdef["y_label"], format=".2f")],
+        )
+        trend  = pts.transform_regression(x_col, y_col).mark_line(
+            opacity=0.35, strokeDash=[5, 4], color=kdef["farbe"])
+        labels = pts.mark_text(dy=-10, fontSize=9.5, color="#4a5568").encode(text="name:N")
+        st.altair_chart(
+            (pts + trend + labels).properties(height=300)
+            .configure_axis(grid=False, labelFontSize=11, labelColor="#718096",
+                            titleFontSize=11, titleColor="#718096")
+            .configure_view(strokeWidth=0),
+            use_container_width=True
+        )
+    else:
+        st.info("Keine ausreichenden Daten.")
+
+# ---------------------------------------------------------------
+# Städtevergleich
+# ---------------------------------------------------------------
+
+st.markdown('<div class="us-section">Städtevergleich</div>', unsafe_allow_html=True)
 
 kategorien = {
-    "Gesamtscore (Standard)":    ("gesamtscore",            False, "#378ADD"),
-    "Personscore (mein Profil)": ("personscore",            False, "#9B59B6"),
-    "Klima":                     ("score_klima",            False, "#5DCAA5"),
-    "Wohnen":                    ("score_wohnen",           False, "#378ADD"),
-    "Wirtschaft":                ("score_wirtschaft",       False, "#EF9F27"),
-    "Infrastruktur":             ("score_infrastruktur",    False, "#D85A30"),
-    "Bildung":                   ("score_bildung",          False, "#9B59B6"),
-    "Gesundheit":                ("score_gesundheit",       False, "#E74C3C"),
-    "Freizeit":                  ("score_freizeit",         False, "#27AE60"),
-    "Sicherheit":                ("score_sicherheit",       False, "#2C3E50"),
-    "Sonnenstunden (h)":         ("sonnenstunden_jahr",     False, "#5DCAA5"),
-    "Mietpreis (€/m²)":         ("mietpreis_kalt_qm",      True,  "#378ADD"),
-    "Arbeitslosigkeit (%)":      ("arbeitslosenquote",      True,  "#EF9F27"),
-    "Straftaten je 100k":        ("straftaten_je_100k",     True,  "#2C3E50"),
-    "Bildungsdichte":            ("bildungs_dichte",        False, "#9B59B6"),
-    "Gesundheitsdichte":         ("gesundheits_dichte",     False, "#E74C3C"),
-    "Freizeitdichte":            ("freizeit_dichte",        False, "#27AE60"),
+    "Personscore (Profil)":     ("personscore",         False, "#111418"),
+    "Gesamtscore (Standard)":   ("gesamtscore",         False, "#3B7EC8"),
+    "Klima":                    ("score_klima",         False, "#4A9B84"),
+    "Wohnen":                   ("score_wohnen",        False, "#3B7EC8"),
+    "Wirtschaft":               ("score_wirtschaft",    False, "#C8891F"),
+    "Infrastruktur":            ("score_infrastruktur", False, "#B84C2A"),
+    "Bildung":                  ("score_bildung",       False, "#7B52AB"),
+    "Gesundheit":               ("score_gesundheit",    False, "#C0392B"),
+    "Freizeit":                 ("score_freizeit",      False, "#27855A"),
+    "Sicherheit":               ("score_sicherheit",    False, "#2C3E50"),
+    "Mietpreis (€/m²)":        ("mietpreis_kalt_qm",   True,  "#3B7EC8"),
+    "Arbeitslosigkeit (%)":     ("arbeitslosenquote",   True,  "#C8891F"),
+    "Straftaten je 100k":       ("straftaten_je_100k",  True,  "#2C3E50"),
+    "Sonnenstunden (h/Jahr)":   ("sonnenstunden_jahr",  False, "#4A9B84"),
+    "Bildungsdichte (/km²)":    ("bildungs_dichte",     False, "#7B52AB"),
+    "Gesundheitsdichte (/km²)": ("gesundheits_dichte",  False, "#C0392B"),
+    "Freizeitdichte (/km²)":    ("freizeit_dichte",     False, "#27855A"),
 }
 
 kat = st.selectbox("Kennzahl", list(kategorien.keys()), label_visibility="collapsed")
@@ -558,20 +667,18 @@ col_name, invertiert, farbe = kategorien[kat]
 if col_name in df_sorted.columns and df_sorted[col_name].notna().any():
     df_bar = df_sorted[["name", col_name]].dropna().sort_values(col_name, ascending=invertiert)
     chart = alt.Chart(df_bar).mark_bar(
-        cornerRadiusTopLeft=4, cornerRadiusTopRight=4, color=farbe
+        cornerRadiusTopLeft=3, cornerRadiusTopRight=3, color=farbe
     ).encode(
         x=alt.X("name:N", sort=None, title=None,
-                axis=alt.Axis(labelAngle=-30, labelFontSize=12)),
+                axis=alt.Axis(labelAngle=-35, labelFontSize=11, labelColor="#4a5568")),
         y=alt.Y(f"{col_name}:Q", title=kat,
-                axis=alt.Axis(labelFontSize=11)),
+                axis=alt.Axis(labelFontSize=10, labelColor="#718096")),
         opacity=alt.condition(
             alt.datum["name"] == stadt_auswahl,
-            alt.value(1.0), alt.value(0.55)
+            alt.value(1.0), alt.value(0.45)
         ),
         tooltip=["name:N", alt.Tooltip(f"{col_name}:Q", title=kat, format=".2f")],
-    ).properties(height=280).configure_axis(
-        grid=False, labelFontSize=12
-    ).configure_view(strokeWidth=0)
+    ).properties(height=260).configure_axis(grid=False).configure_view(strokeWidth=0)
     st.altair_chart(chart, use_container_width=True)
 else:
     st.info(f"Keine Daten für '{kat}' vorhanden.")
@@ -580,7 +687,7 @@ else:
 # Karte
 # ---------------------------------------------------------------
 
-st.markdown('<div class="section-label">Karte</div>', unsafe_allow_html=True)
+st.markdown('<div class="us-section">Karte</div>', unsafe_allow_html=True)
 karte_df = df_sorted[["name", "latitude", "longitude", "personscore"]].copy()
 karte_df = karte_df.rename(columns={"latitude": "lat", "longitude": "lon"})
 karte_df["personscore"] = karte_df["personscore"].fillna(0)
@@ -594,16 +701,16 @@ if not ranking.empty and not zeit.empty:
     zr = ranking.merge(staedte[["stadt_id", "name"]], on="stadt_id")
     zr = zr.merge(zeit[["zeit_id", "jahr"]], on="zeit_id")
     if len(zr["jahr"].unique()) > 1:
-        st.markdown('<div class="section-label">Entwicklung über Zeit</div>', unsafe_allow_html=True)
-        metrik_optionen = {
-            "gesamtscore": "Gesamtscore", "score_klima": "Klima", "score_wohnen": "Wohnen",
-            "score_wirtschaft": "Wirtschaft", "score_infrastruktur": "Infrastruktur",
-            "score_bildung": "Bildung", "score_gesundheit": "Gesundheit",
-            "score_freizeit": "Freizeit", "score_sicherheit": "Sicherheit",
-        }
-        verfuegbare = {k: v for k, v in metrik_optionen.items() if k in zr.columns}
-        metrik = st.selectbox("Metrik", list(verfuegbare.keys()),
-            format_func=lambda x: verfuegbare[x], label_visibility="collapsed")
+        st.markdown('<div class="us-section">Entwicklung über Zeit</div>', unsafe_allow_html=True)
+        metrik_opt = {k: v for k, v in {
+            "gesamtscore": "Gesamtscore", "score_klima": "Klima",
+            "score_wohnen": "Wohnen", "score_wirtschaft": "Wirtschaft",
+            "score_infrastruktur": "Infrastruktur", "score_bildung": "Bildung",
+            "score_gesundheit": "Gesundheit", "score_freizeit": "Freizeit",
+            "score_sicherheit": "Sicherheit",
+        }.items() if k in zr.columns}
+        metrik = st.selectbox("Metrik", list(metrik_opt.keys()),
+            format_func=lambda x: metrik_opt[x], label_visibility="collapsed")
         linie = alt.Chart(zr).mark_line(point=True).encode(
             x=alt.X("jahr:O", title="Jahr"),
             y=alt.Y(f"{metrik}:Q", scale=alt.Scale(domain=[0, 1]), title="Score"),
@@ -613,32 +720,27 @@ if not ranking.empty and not zeit.empty:
         st.altair_chart(linie, use_container_width=True)
 
 # ---------------------------------------------------------------
-# API-Status
+# API-Status & Footer
 # ---------------------------------------------------------------
 
-st.markdown("<div style='margin-top:1rem'></div>", unsafe_allow_html=True)
-api_html = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:0.5rem">'
+st.markdown("<div style='margin-top:2rem'></div>", unsafe_allow_html=True)
+api_html = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1.5rem">'
 for api_name, aktiv in [
-    ("Open-Meteo (Klima)",          hat_wetter),
-    ("Mietspiegel (Wohnen)",        hat_miete),
-    ("Arbeitsagentur (Wirtschaft)", hat_arbeit),
-    ("Overpass/OSM (Infra)",        hat_infra),
-    ("Overpass/OSM (Bildung)",      hat_bildung),
-    ("Overpass/OSM (Gesundheit)",   hat_gesundheit),
-    ("Overpass/OSM (Freizeit)",     hat_freizeit),
-    ("BKA PKS (Sicherheit)",        hat_sicherheit),
+    ("Open-Meteo", hat_wetter), ("Mietspiegel", hat_miete),
+    ("Arbeitsagentur", hat_arbeit), ("OSM Infra", hat_infra),
+    ("OSM Bildung", hat_bildung), ("OSM Gesundheit", hat_gesundheit),
+    ("OSM Freizeit", hat_freizeit), ("BKA PKS", hat_sicherheit),
 ]:
-    farbe  = "#c6f6d5" if aktiv else "#fed7d7"
-    txt    = "#276749" if aktiv else "#9b2c2c"
-    status = "aktiv"   if aktiv else "ausstehend"
-    api_html += f'<div style="background:{farbe};color:{txt};font-size:0.72rem;padding:4px 12px;border-radius:999px;font-weight:500">{api_name} · {status}</div>'
+    bg  = "#f0fff4" if aktiv else "#fff5f5"
+    txt = "#276749" if aktiv else "#9b2c2c"
+    dot = "●" if aktiv else "○"
+    api_html += f'<div style="background:{bg};color:{txt};font-size:0.68rem;padding:3px 10px;border-radius:3px;font-weight:500">{dot} {api_name}</div>'
 api_html += '</div>'
 st.markdown(api_html, unsafe_allow_html=True)
 
-# Footer
 st.markdown(
-    "<div style='margin-top:2.5rem;text-align:center;color:#b0bec8;font-size:0.75rem;padding:1rem 0'>"
-    "UrbanScore Deutschland · Open-Meteo · Mietspiegel · Bundesagentur für Arbeit · "
-    "OpenStreetMap · BKA PKS 2023</div>",
+    "<div style='text-align:center;color:#cbd5e0;font-size:0.72rem;padding:1rem 0;"
+    "border-top:1px solid #f0f2f5'>UrbanScore Deutschland &nbsp;·&nbsp; "
+    "Open-Meteo · Mietspiegel · Bundesagentur für Arbeit · OpenStreetMap · BKA PKS 2023</div>",
     unsafe_allow_html=True
 )
