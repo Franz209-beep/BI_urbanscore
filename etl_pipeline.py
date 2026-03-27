@@ -163,7 +163,7 @@ def get_stadt_id(conn, name):
 
 def bereits_vorhanden(conn, tabelle, stadt_id, zeit_id):
     """Prüft ob ein Datensatz existiert UND vollständig ist.
-    Bei 0-Werten durch Timeouts wird neu abgefragt.
+    Einzelne Felder mit 0 werden als unvollständig gewertet und neu abgefragt.
     """
     row = conn.execute(
         f"SELECT 1 FROM {tabelle} WHERE stadt_id = ? AND zeit_id = ?",
@@ -172,43 +172,45 @@ def bereits_vorhanden(conn, tabelle, stadt_id, zeit_id):
     if not row:
         return False
 
-    # Tabellen-spezifische Vollständigkeitsprüfung
+    def loesche_und_false(grund):
+        print(f"  [Cache] {tabelle} unvollständig ({grund}) → wird neu abgefragt")
+        conn.execute(f"DELETE FROM {tabelle} WHERE stadt_id = ? AND zeit_id = ?",
+                     (stadt_id, zeit_id))
+        conn.commit()
+        return False
+
     if tabelle == "bildungsdaten":
         r = conn.execute(
-            "SELECT schulen_anzahl, kitas_anzahl, bildungs_dichte FROM bildungsdaten "
+            "SELECT schulen_anzahl, kitas_anzahl, unis_anzahl FROM bildungsdaten "
             "WHERE stadt_id = ? AND zeit_id = ?", (stadt_id, zeit_id)
         ).fetchone()
-        # Unvollständig wenn alle Hauptwerte 0 oder NULL sind
-        if r and (r[0] or 0) + (r[1] or 0) == 0:
-            print(f"  [Cache] bildungsdaten unvollständig (alle 0) → wird neu abgefragt")
-            conn.execute("DELETE FROM bildungsdaten WHERE stadt_id = ? AND zeit_id = ?",
-                         (stadt_id, zeit_id))
-            conn.commit()
-            return False
+        if r:
+            if (r[0] or 0) == 0 and (r[1] or 0) == 0:
+                return loesche_und_false("Schulen=0 und Kitas=0")
 
     elif tabelle == "gesundheitsdaten":
         r = conn.execute(
-            "SELECT aerzte_anzahl, apotheken_anzahl, krankenhaeuser_anzahl FROM gesundheitsdaten "
-            "WHERE stadt_id = ? AND zeit_id = ?", (stadt_id, zeit_id)
+            "SELECT aerzte_anzahl, apotheken_anzahl, krankenhaeuser_anzahl "
+            "FROM gesundheitsdaten WHERE stadt_id = ? AND zeit_id = ?",
+            (stadt_id, zeit_id)
         ).fetchone()
-        if r and (r[0] or 0) + (r[1] or 0) + (r[2] or 0) == 0:
-            print(f"  [Cache] gesundheitsdaten unvollständig (alle 0) → wird neu abgefragt")
-            conn.execute("DELETE FROM gesundheitsdaten WHERE stadt_id = ? AND zeit_id = ?",
-                         (stadt_id, zeit_id))
-            conn.commit()
-            return False
+        if r:
+            # Jedes Feld einzeln prüfen – Berlin hat Ärzte aber keine Apotheken
+            if (r[1] or 0) == 0:   # Apotheken fehlen
+                return loesche_und_false("Apotheken=0")
+            if (r[0] or 0) == 0:   # Ärzte fehlen
+                return loesche_und_false("Aerzte=0")
 
     elif tabelle == "freizeitdaten":
         r = conn.execute(
             "SELECT parks_anzahl, kultur_anzahl, sport_anzahl FROM freizeitdaten "
             "WHERE stadt_id = ? AND zeit_id = ?", (stadt_id, zeit_id)
         ).fetchone()
-        if r and (r[0] or 0) + (r[1] or 0) + (r[2] or 0) == 0:
-            print(f"  [Cache] freizeitdaten unvollständig (alle 0) → wird neu abgefragt")
-            conn.execute("DELETE FROM freizeitdaten WHERE stadt_id = ? AND zeit_id = ?",
-                         (stadt_id, zeit_id))
-            conn.commit()
-            return False
+        if r:
+            if (r[1] or 0) == 0:   # Kultur fehlt
+                return loesche_und_false("Kultur=0")
+            if (r[0] or 0) == 0 and (r[2] or 0) == 0:
+                return loesche_und_false("Parks=0 und Sport=0")
 
     elif tabelle == "infrastruktur":
         r = conn.execute(
@@ -216,11 +218,7 @@ def bereits_vorhanden(conn, tabelle, stadt_id, zeit_id):
             "WHERE stadt_id = ? AND zeit_id = ?", (stadt_id, zeit_id)
         ).fetchone()
         if r and (r[0] or 0) == 0 and (r[1] or 0.0) == 0.0:
-            print(f"  [Cache] infrastruktur unvollständig (alle 0) → wird neu abgefragt")
-            conn.execute("DELETE FROM infrastruktur WHERE stadt_id = ? AND zeit_id = ?",
-                         (stadt_id, zeit_id))
-            conn.commit()
-            return False
+            return loesche_und_false("Haltestellen=0 und POI=0")
 
     return True
 
