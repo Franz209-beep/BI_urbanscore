@@ -30,27 +30,30 @@ from sklearn.preprocessing import MinMaxScaler
 DB_PATH = "urbanscore.db"
 
 STAEDTE = [
-    {"name": "Berlin",      "ags": "11000000", "lat": 52.5200, "lon": 13.4050, "radius_km": 20},
-    {"name": "Hamburg",     "ags": "02000000", "lat": 53.5753, "lon": 10.0153, "radius_km": 18},
-    {"name": "München",     "ags": "09162000", "lat": 48.1351, "lon": 11.5820, "radius_km": 15},
-    {"name": "Köln",        "ags": "05315000", "lat": 50.9333, "lon":  6.9500, "radius_km": 15},
-    {"name": "Frankfurt",   "ags": "06412000", "lat": 50.1109, "lon":  8.6821, "radius_km": 12},
-    {"name": "Düsseldorf",  "ags": "05111000", "lat": 51.2217, "lon":  6.7762, "radius_km": 12},
-    {"name": "Stuttgart",   "ags": "08111000", "lat": 48.7758, "lon":  9.1829, "radius_km": 12},
-    {"name": "Leipzig",     "ags": "14713000", "lat": 51.3397, "lon": 12.3731, "radius_km": 12},
-    {"name": "Dortmund",    "ags": "05913000", "lat": 51.5136, "lon":  7.4653, "radius_km": 12},
-    {"name": "Bremen",      "ags": "04011000", "lat": 53.0793, "lon":  8.8017, "radius_km": 12},
-    {"name": "Essen",       "ags": "05113000", "lat": 51.4556, "lon":  7.0116, "radius_km": 10},
-    {"name": "Dresden",     "ags": "14612000", "lat": 51.0504, "lon": 13.7373, "radius_km": 12},
-    {"name": "Hannover",    "ags": "03241001", "lat": 52.3759, "lon":  9.7320, "radius_km": 12},
-    {"name": "Nürnberg",    "ags": "09564000", "lat": 49.4521, "lon": 11.0767, "radius_km": 12},
-    {"name": "Duisburg",    "ags": "05112000", "lat": 51.4344, "lon":  6.7623, "radius_km": 10},
-    {"name": "Bochum",      "ags": "05911000", "lat": 51.4818, "lon":  7.2162, "radius_km": 10},
-    {"name": "Wuppertal",   "ags": "05124000", "lat": 51.2562, "lon":  7.1508, "radius_km": 10},
-    {"name": "Bielefeld",   "ags": "05711000", "lat": 52.0302, "lon":  8.5325, "radius_km": 10},
-    {"name": "Bonn",        "ags": "05314000", "lat": 50.7374, "lon":  7.0982, "radius_km": 10},
-    {"name": "Münster",     "ags": "05515000", "lat": 51.9607, "lon":  7.6261, "radius_km": 10},
+    {"name": "Berlin",      "ags": "11000000", "lat": 52.5200, "lon": 13.4050, "radius_km": 20, "einwohner": 3645000},
+    {"name": "Hamburg",     "ags": "02000000", "lat": 53.5753, "lon": 10.0153, "radius_km": 18, "einwohner": 1853000},
+    {"name": "München",     "ags": "09162000", "lat": 48.1351, "lon": 11.5820, "radius_km": 15, "einwohner": 1488000},
+    {"name": "Köln",        "ags": "05315000", "lat": 50.9333, "lon":  6.9500, "radius_km": 15, "einwohner": 1084000},
+    {"name": "Frankfurt",   "ags": "06412000", "lat": 50.1109, "lon":  8.6821, "radius_km": 12, "einwohner":  759000},
+    {"name": "Düsseldorf",  "ags": "05111000", "lat": 51.2217, "lon":  6.7762, "radius_km": 12, "einwohner":  619000},
+    {"name": "Stuttgart",   "ags": "08111000", "lat": 48.7758, "lon":  9.1829, "radius_km": 12, "einwohner":  626000},
+    {"name": "Leipzig",     "ags": "14713000", "lat": 51.3397, "lon": 12.3731, "radius_km": 12, "einwohner":  628000},
+    {"name": "Dortmund",    "ags": "05913000", "lat": 51.5136, "lon":  7.4653, "radius_km": 12, "einwohner":  588000},
+    {"name": "Bremen",      "ags": "04011000", "lat": 53.0793, "lon":  8.8017, "radius_km": 12, "einwohner":  563000},
+    {"name": "Essen",       "ags": "05113000", "lat": 51.4556, "lon":  7.0116, "radius_km": 10, "einwohner":  580000},
+    {"name": "Dresden",     "ags": "14612000", "lat": 51.0504, "lon": 13.7373, "radius_km": 12, "einwohner":  556000},
+    {"name": "Hannover",    "ags": "03241001", "lat": 52.3759, "lon":  9.7320, "radius_km": 12, "einwohner":  532000},
+    {"name": "Nürnberg",    "ags": "09564000", "lat": 49.4521, "lon": 11.0767, "radius_km": 12, "einwohner":  511000},
+    {"name": "Duisburg",    "ags": "05112000", "lat": 51.4344, "lon":  6.7623, "radius_km": 10, "einwohner":  495000},
+    {"name": "Bochum",      "ags": "05911000", "lat": 51.4818, "lon":  7.2162, "radius_km": 10, "einwohner":  365000},
+    {"name": "Wuppertal",   "ags": "05124000", "lat": 51.2562, "lon":  7.1508, "radius_km": 10, "einwohner":  355000},
+    {"name": "Bielefeld",   "ags": "05711000", "lat": 52.0302, "lon":  8.5325, "radius_km": 10, "einwohner":  333000},
+    {"name": "Bonn",        "ags": "05314000", "lat": 50.7374, "lon":  7.0982, "radius_km": 10, "einwohner":  329000},
+    {"name": "Münster",     "ags": "05515000", "lat": 51.9607, "lon":  7.6261, "radius_km": 10, "einwohner":  317000},
 ]
+
+# Einwohner-Lookup für schnellen Zugriff im Ranking
+EINWOHNER = {s["name"]: s["einwohner"] for s in STAEDTE}
 
 # ---------------------------------------------------------------
 # Statische Daten (unveränderlich / jährlich)
@@ -182,6 +185,7 @@ def erstelle_neue_tabellen(conn):
             kitas_anzahl        INTEGER,
             unis_anzahl         INTEGER,
             bildungs_dichte     REAL,
+            bildung_pro_100k    REAL,
             UNIQUE(stadt_id, zeit_id)
         )
     """)
@@ -195,6 +199,7 @@ def erstelle_neue_tabellen(conn):
             krankenhaeuser_anzahl INTEGER,
             apotheken_anzahl     INTEGER,
             gesundheits_dichte   REAL,
+            gesundheit_pro_100k  REAL,
             UNIQUE(stadt_id, zeit_id)
         )
     """)
@@ -208,6 +213,7 @@ def erstelle_neue_tabellen(conn):
             kultur_anzahl       INTEGER,
             sport_anzahl        INTEGER,
             freizeit_dichte     REAL,
+            freizeit_pro_100k   REAL,
             UNIQUE(stadt_id, zeit_id)
         )
     """)
@@ -223,7 +229,7 @@ def erstelle_neue_tabellen(conn):
         )
     """)
 
-    # Ranking-Tabelle um neue Score-Spalten erweitern
+    # Neue Spalten ergänzen falls DB bereits existiert
     for col in [
         "score_bildung REAL",
         "score_gesundheit REAL",
@@ -232,6 +238,18 @@ def erstelle_neue_tabellen(conn):
     ]:
         try:
             conn.execute(f"ALTER TABLE ranking ADD COLUMN {col}")
+        except Exception:
+            pass
+
+    # Pro-Kopf-Spalten nachrüsten falls DB älter ist
+    migrationen = [
+        ("bildungsdaten",   "bildung_pro_100k   REAL"),
+        ("gesundheitsdaten","gesundheit_pro_100k REAL"),
+        ("freizeitdaten",   "freizeit_pro_100k  REAL"),
+    ]
+    for tabelle, spalte in migrationen:
+        try:
+            conn.execute(f"ALTER TABLE {tabelle} ADD COLUMN {spalte}")
         except Exception:
             pass  # Spalte existiert bereits
 
@@ -358,8 +376,10 @@ def extract_infrastruktur(stadt):
 # EXTRACT: Overpass – Bildung, Gesundheit, Freizeit (NEU)
 # ---------------------------------------------------------------
 
-
 def _overpass_count(query):
+    """Hilfsfunktion: Sendet eine Overpass-Abfrage und gibt die Anzahl zurück.
+    Gibt None zurück wenn alle Versuche fehlschlagen (nicht 0!).
+    """
     overpass_url = "https://overpass-api.de/api/interpreter"
     for versuch in range(3):
         try:
@@ -370,28 +390,47 @@ def _overpass_count(query):
             print(f"    [Overpass] Versuch {versuch+1}/3: {e}")
             if versuch < 2:
                 time.sleep(15)
-    return None 
+    return None  # None statt 0 – wird im Score als fehlend behandelt
+
+
+def _pro_kopf(anzahl, einwohner, faktor=100_000):
+    """Normiert einen absoluten Wert auf faktor Einwohner."""
+    if anzahl is None or einwohner == 0:
+        return None
+    return round(anzahl / einwohner * faktor, 2)
+
+
+def _dichte(anzahl, radius_km):
+    """Normiert einen absoluten Wert auf km²."""
+    if anzahl is None:
+        return None
+    flaeche = math.pi * (radius_km ** 2)
+    return round(anzahl / flaeche, 3)
 
 
 def extract_bildung(stadt):
-    """Schulen, Kitas, Universitäten via Overpass."""
-    lat = stadt["lat"]
-    lon = stadt["lon"]
-    rad = stadt["radius_km"] * 1000
+    """Schulen, Kitas, Universitäten via Overpass.
+    Normierung: Dichte (je km²) UND Pro-Kopf (je 100k EW) – Mittelwert beider Werte.
+    So werden große Städte nicht bevorteilt.
+    """
+    lat        = stadt["lat"]
+    lon        = stadt["lon"]
+    rad        = stadt["radius_km"] * 1000
+    einwohner  = stadt["einwohner"]
 
     schulen = _overpass_count(f"""
     [out:json][timeout:60];
     (node["amenity"="school"](around:{rad},{lat},{lon});
      way["amenity"="school"](around:{rad},{lat},{lon}););
     out count;
-    """) or 0
+    """)
     time.sleep(5)
     kitas = _overpass_count(f"""
     [out:json][timeout:60];
     (node["amenity"="kindergarten"](around:{rad},{lat},{lon});
      way["amenity"="kindergarten"](around:{rad},{lat},{lon}););
     out count;
-    """) or 0
+    """)
     time.sleep(5)
     unis = _overpass_count(f"""
     [out:json][timeout:60];
@@ -399,61 +438,79 @@ def extract_bildung(stadt):
      node["amenity"="college"](around:{rad},{lat},{lon});
      way["amenity"="university"](around:{rad},{lat},{lon}););
     out count;
-    """) or 0
+    """)
 
-    flaeche = math.pi * (stadt["radius_km"] ** 2)
-    dichte  = round((schulen + kitas + unis) / flaeche, 3)
-    print(f"  [Bildung] {stadt['name']}: {schulen} Schulen, {kitas} Kitas, {unis} Unis → {dichte}/km²")
+    gesamt = (schulen or 0) + (kitas or 0) + (unis or 0)
+
+    # Dichte (je km²) – bereinigt um Stadtfläche
+    bildungs_dichte    = _dichte(gesamt, stadt["radius_km"])
+    # Pro-Kopf (je 100k Einwohner) – bereinigt um Stadtgröße
+    bildung_pro_100k   = _pro_kopf(gesamt, einwohner)
+
+    print(f"  [Bildung] {stadt['name']}: {schulen} Schulen, {kitas} Kitas, {unis} Unis "
+          f"→ {bildungs_dichte}/km² | {bildung_pro_100k}/100k EW")
     return {
-        "schulen_anzahl":   schulen,
-        "kitas_anzahl":     kitas,
-        "unis_anzahl":      unis,
-        "bildungs_dichte":  dichte,
+        "schulen_anzahl":    schulen or 0,
+        "kitas_anzahl":      kitas   or 0,
+        "unis_anzahl":       unis    or 0,
+        "bildungs_dichte":   bildungs_dichte,
+        "bildung_pro_100k":  bildung_pro_100k,
     }
 
 
 def extract_gesundheit(stadt):
-    """Ärzte, Krankenhäuser, Apotheken via Overpass."""
-    lat = stadt["lat"]
-    lon = stadt["lon"]
-    rad = stadt["radius_km"] * 1000
+    """Ärzte, Krankenhäuser, Apotheken via Overpass.
+    Normierung: Dichte + Pro-Kopf.
+    """
+    lat       = stadt["lat"]
+    lon       = stadt["lon"]
+    rad       = stadt["radius_km"] * 1000
+    einwohner = stadt["einwohner"]
 
     aerzte = _overpass_count(f"""
     [out:json][timeout:60];
     (node["amenity"="doctors"](around:{rad},{lat},{lon});
      node["amenity"="clinic"](around:{rad},{lat},{lon}););
     out count;
-    """) or 0
+    """)
     time.sleep(5)
     krankenhaeuser = _overpass_count(f"""
     [out:json][timeout:60];
     (node["amenity"="hospital"](around:{rad},{lat},{lon});
      way["amenity"="hospital"](around:{rad},{lat},{lon}););
     out count;
-    """) or 0
+    """)
     time.sleep(5)
     apotheken = _overpass_count(f"""
     [out:json][timeout:60];
     (node["amenity"="pharmacy"](around:{rad},{lat},{lon}););
     out count;
-    """) or 0
+    """)
 
-    flaeche = math.pi * (stadt["radius_km"] ** 2)
-    dichte  = round((aerzte + krankenhaeuser + apotheken) / flaeche, 3)
-    print(f"  [Gesundheit] {stadt['name']}: {aerzte} Ärzte, {krankenhaeuser} KH, {apotheken} Apotheken")
+    gesamt = (aerzte or 0) + (krankenhaeuser or 0) + (apotheken or 0)
+
+    gesundheits_dichte   = _dichte(gesamt, stadt["radius_km"])
+    gesundheit_pro_100k  = _pro_kopf(gesamt, einwohner)
+
+    print(f"  [Gesundheit] {stadt['name']}: {aerzte} Ärzte, {krankenhaeuser} KH, {apotheken} Apotheken "
+          f"→ {gesundheits_dichte}/km² | {gesundheit_pro_100k}/100k EW")
     return {
-        "aerzte_anzahl":          aerzte,
-        "krankenhaeuser_anzahl":  krankenhaeuser,
-        "apotheken_anzahl":       apotheken,
-        "gesundheits_dichte":     dichte,
+        "aerzte_anzahl":          aerzte          or 0,
+        "krankenhaeuser_anzahl":  krankenhaeuser  or 0,
+        "apotheken_anzahl":       apotheken       or 0,
+        "gesundheits_dichte":     gesundheits_dichte,
+        "gesundheit_pro_100k":    gesundheit_pro_100k,
     }
 
 
 def extract_freizeit(stadt):
-    """Parks, Kultureinrichtungen, Sportstätten via Overpass."""
-    lat = stadt["lat"]
-    lon = stadt["lon"]
-    rad = stadt["radius_km"] * 1000
+    """Parks, Kultureinrichtungen, Sportstätten via Overpass.
+    Normierung: Dichte + Pro-Kopf.
+    """
+    lat       = stadt["lat"]
+    lon       = stadt["lon"]
+    rad       = stadt["radius_km"] * 1000
+    einwohner = stadt["einwohner"]
 
     parks = _overpass_count(f"""
     [out:json][timeout:60];
@@ -461,7 +518,7 @@ def extract_freizeit(stadt):
      way["leisure"="park"](around:{rad},{lat},{lon});
      way["leisure"="nature_reserve"](around:{rad},{lat},{lon}););
     out count;
-    """) or 0
+    """)
     time.sleep(5)
     kultur = _overpass_count(f"""
     [out:json][timeout:60];
@@ -470,7 +527,7 @@ def extract_freizeit(stadt):
      node["tourism"="museum"](around:{rad},{lat},{lon});
      node["amenity"="arts_centre"](around:{rad},{lat},{lon}););
     out count;
-    """) or 0
+    """)
     time.sleep(5)
     sport = _overpass_count(f"""
     [out:json][timeout:60];
@@ -478,16 +535,21 @@ def extract_freizeit(stadt):
      node["leisure"="swimming_pool"](around:{rad},{lat},{lon});
      way["leisure"="pitch"](around:{rad},{lat},{lon}););
     out count;
-    """) or 0
+    """)
 
-    flaeche = math.pi * (stadt["radius_km"] ** 2)
-    dichte  = round((parks + kultur + sport) / flaeche, 3)
-    print(f"  [Freizeit] {stadt['name']}: {parks} Parks, {kultur} Kultur, {sport} Sport")
+    gesamt = (parks or 0) + (kultur or 0) + (sport or 0)
+
+    freizeit_dichte   = _dichte(gesamt, stadt["radius_km"])
+    freizeit_pro_100k = _pro_kopf(gesamt, einwohner)
+
+    print(f"  [Freizeit] {stadt['name']}: {parks} Parks, {kultur} Kultur, {sport} Sport "
+          f"→ {freizeit_dichte}/km² | {freizeit_pro_100k}/100k EW")
     return {
-        "parks_anzahl":     parks,
-        "kultur_anzahl":    kultur,
-        "sport_anzahl":     sport,
-        "freizeit_dichte":  dichte,
+        "parks_anzahl":       parks   or 0,
+        "kultur_anzahl":      kultur  or 0,
+        "sport_anzahl":       sport   or 0,
+        "freizeit_dichte":    freizeit_dichte,
+        "freizeit_pro_100k":  freizeit_pro_100k,
     }
 
 
@@ -541,44 +603,52 @@ def load_infrastruktur(conn, stadt_id, zeit_id, d):
 def load_bildung(conn, stadt_id, zeit_id, d):
     conn.execute("""
         INSERT INTO bildungsdaten
-            (stadt_id, zeit_id, schulen_anzahl, kitas_anzahl, unis_anzahl, bildungs_dichte)
-        VALUES (?, ?, ?, ?, ?, ?)
+            (stadt_id, zeit_id, schulen_anzahl, kitas_anzahl, unis_anzahl,
+             bildungs_dichte, bildung_pro_100k)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(stadt_id, zeit_id) DO UPDATE SET
             schulen_anzahl   = excluded.schulen_anzahl,
             kitas_anzahl     = excluded.kitas_anzahl,
             unis_anzahl      = excluded.unis_anzahl,
-            bildungs_dichte  = excluded.bildungs_dichte
+            bildungs_dichte  = excluded.bildungs_dichte,
+            bildung_pro_100k = excluded.bildung_pro_100k
     """, (stadt_id, zeit_id,
-          d["schulen_anzahl"], d["kitas_anzahl"], d["unis_anzahl"], d["bildungs_dichte"]))
+          d["schulen_anzahl"], d["kitas_anzahl"], d["unis_anzahl"],
+          d["bildungs_dichte"], d["bildung_pro_100k"]))
 
 
 def load_gesundheit(conn, stadt_id, zeit_id, d):
     conn.execute("""
         INSERT INTO gesundheitsdaten
-            (stadt_id, zeit_id, aerzte_anzahl, krankenhaeuser_anzahl, apotheken_anzahl, gesundheits_dichte)
-        VALUES (?, ?, ?, ?, ?, ?)
+            (stadt_id, zeit_id, aerzte_anzahl, krankenhaeuser_anzahl, apotheken_anzahl,
+             gesundheits_dichte, gesundheit_pro_100k)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(stadt_id, zeit_id) DO UPDATE SET
             aerzte_anzahl          = excluded.aerzte_anzahl,
             krankenhaeuser_anzahl  = excluded.krankenhaeuser_anzahl,
             apotheken_anzahl       = excluded.apotheken_anzahl,
-            gesundheits_dichte     = excluded.gesundheits_dichte
+            gesundheits_dichte     = excluded.gesundheits_dichte,
+            gesundheit_pro_100k    = excluded.gesundheit_pro_100k
     """, (stadt_id, zeit_id,
-          d["aerzte_anzahl"], d["krankenhaeuser_anzahl"],
-          d["apotheken_anzahl"], d["gesundheits_dichte"]))
+          d["aerzte_anzahl"], d["krankenhaeuser_anzahl"], d["apotheken_anzahl"],
+          d["gesundheits_dichte"], d["gesundheit_pro_100k"]))
 
 
 def load_freizeit(conn, stadt_id, zeit_id, d):
     conn.execute("""
         INSERT INTO freizeitdaten
-            (stadt_id, zeit_id, parks_anzahl, kultur_anzahl, sport_anzahl, freizeit_dichte)
-        VALUES (?, ?, ?, ?, ?, ?)
+            (stadt_id, zeit_id, parks_anzahl, kultur_anzahl, sport_anzahl,
+             freizeit_dichte, freizeit_pro_100k)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(stadt_id, zeit_id) DO UPDATE SET
-            parks_anzahl    = excluded.parks_anzahl,
-            kultur_anzahl   = excluded.kultur_anzahl,
-            sport_anzahl    = excluded.sport_anzahl,
-            freizeit_dichte = excluded.freizeit_dichte
+            parks_anzahl      = excluded.parks_anzahl,
+            kultur_anzahl     = excluded.kultur_anzahl,
+            sport_anzahl      = excluded.sport_anzahl,
+            freizeit_dichte   = excluded.freizeit_dichte,
+            freizeit_pro_100k = excluded.freizeit_pro_100k
     """, (stadt_id, zeit_id,
-          d["parks_anzahl"], d["kultur_anzahl"], d["sport_anzahl"], d["freizeit_dichte"]))
+          d["parks_anzahl"], d["kultur_anzahl"], d["sport_anzahl"],
+          d["freizeit_dichte"], d["freizeit_pro_100k"]))
 
 
 def load_sicherheit(conn, stadt_id, zeit_id, d):
@@ -604,9 +674,9 @@ def berechne_ranking(conn, zeit_id):
             m.mietpreis_kalt_qm,
             a.arbeitslosenquote,
             i.poi_dichte,
-            b.bildungs_dichte,
-            g.gesundheits_dichte,
-            f.freizeit_dichte,
+            b.bildungs_dichte,   b.bildung_pro_100k,
+            g.gesundheits_dichte, g.gesundheit_pro_100k,
+            f.freizeit_dichte,   f.freizeit_pro_100k,
             si.straftaten_je_100k
         FROM stadt s
         LEFT JOIN wetterdaten       w  ON w.stadt_id  = s.stadt_id AND w.zeit_id  = ?
@@ -626,25 +696,51 @@ def berechne_ranking(conn, zeit_id):
     scaler = MinMaxScaler()
 
     def score_hoch(col):
-        """Höher = besser"""
+        """Höher = besser. Fehlende Werte → Mittelwert (neutral)."""
+        if col not in df.columns or not df[col].notna().any():
+            return pd.Series([0.5] * len(df))
         filled = df[[col]].fillna(df[col].mean())
-        return scaler.fit_transform(filled).flatten() if df[col].notna().any() else 0.5
+        return pd.Series(scaler.fit_transform(filled).flatten(), index=df.index)
 
     def score_niedrig(col):
-        """Niedriger = besser (invertiert)"""
+        """Niedriger = besser (invertiert)."""
+        if col not in df.columns or not df[col].notna().any():
+            return pd.Series([0.5] * len(df))
         filled = df[[col]].fillna(df[col].mean())
-        return (1 - scaler.fit_transform(filled)).flatten() if df[col].notna().any() else 0.5
+        return pd.Series((1 - scaler.fit_transform(filled)).flatten(), index=df.index)
 
+    def score_kombiniert(col_dichte, col_pro_100k):
+        """
+        Kombiniert Dichte-Score und Pro-Kopf-Score zu einem fairen Score.
+        Dichte    → bereinigt um Stadtfläche (kompakte vs. weitläufige Städte)
+        Pro-Kopf  → bereinigt um Einwohnerzahl (große vs. kleine Städte)
+        Mittelwert beider Werte → Großstädte werden nicht bevorteilt.
+        """
+        s_dichte   = score_hoch(col_dichte)
+        s_pro_kopf = score_hoch(col_pro_100k)
+        # Nur verfügbare Werte kombinieren
+        hat_dichte   = col_dichte   in df.columns and df[col_dichte].notna().any()
+        hat_pro_kopf = col_pro_100k in df.columns and df[col_pro_100k].notna().any()
+        if hat_dichte and hat_pro_kopf:
+            return (s_dichte + s_pro_kopf) / 2
+        elif hat_dichte:
+            return s_dichte
+        elif hat_pro_kopf:
+            return s_pro_kopf
+        return pd.Series([0.5] * len(df))
+
+    # Klima & Wohnen: keine Größenverzerrung, direkt normieren
     df["score_klima"]         = score_hoch("sonnenstunden_jahr")
     df["score_wohnen"]        = score_niedrig("mietpreis_kalt_qm")
     df["score_wirtschaft"]    = score_niedrig("arbeitslosenquote")
-    df["score_infrastruktur"] = score_hoch("poi_dichte")
-    df["score_bildung"]       = score_hoch("bildungs_dichte")
-    df["score_gesundheit"]    = score_hoch("gesundheits_dichte")
-    df["score_freizeit"]      = score_hoch("freizeit_dichte")
-    df["score_sicherheit"]    = score_niedrig("straftaten_je_100k")
+    df["score_infrastruktur"] = score_hoch("poi_dichte")  # bereits Dichte
 
-    # Gewichtung (Summe = 1.0)
+    # Neue Kategorien: fair kombiniert aus Dichte + Pro-Kopf
+    df["score_bildung"]    = score_kombiniert("bildungs_dichte",    "bildung_pro_100k")
+    df["score_gesundheit"] = score_kombiniert("gesundheits_dichte", "gesundheit_pro_100k")
+    df["score_freizeit"]   = score_kombiniert("freizeit_dichte",    "freizeit_pro_100k")
+    df["score_sicherheit"] = score_niedrig("straftaten_je_100k")  # bereits je 100k EW
+
     GEWICHTE = {
         "score_klima":         0.10,
         "score_wohnen":        0.20,
@@ -702,7 +798,6 @@ def berechne_ranking(conn, zeit_id):
 def main():
     heute = date.today()
     overpass_tag = heute.weekday() == 0
-    #overpass_tag = True
 
     print(f"=== UrbanScore ETL-Pipeline gestartet ({heute}) ===")
     print(f"    Städte: {len(STAEDTE)} | Overpass-Update: {'ja' if overpass_tag else 'nein (nur montags)'}\n")
