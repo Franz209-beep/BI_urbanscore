@@ -701,7 +701,8 @@ def berechne_ranking(conn, zeit_id):
 
 def main():
     heute = date.today()
-    overpass_tag = heute.weekday() == 0
+    #overpass_tag = heute.weekday() == 0
+    overpass_tag = True
 
     print(f"=== UrbanScore ETL-Pipeline gestartet ({heute}) ===")
     print(f"    Städte: {len(STAEDTE)} | Overpass-Update: {'ja' if overpass_tag else 'nein (nur montags)'}\n")
