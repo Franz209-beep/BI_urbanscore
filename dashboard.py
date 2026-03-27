@@ -290,9 +290,27 @@ if aktive_persona == "Individuell":
     # Normieren auf 100 — kein Overflow möglich
     gesamt_raw = sum(raw.values()) or 1
     gewichte_user = {k: round(v / gesamt_raw * 100, 1) for k, v in raw.items()}
-    st.caption(f"Summe der Gewichte: {sum(gewichte_user.values()):.0f}% (automatisch normiert)")
+    st.caption(f"Summe: {sum(gewichte_user.values()):.0f}% (automatisch normiert)")
 else:
     gewichte_user = {k: float(v) for k, v in persona_gewichte.items()}
+
+# Gewichtsverteilung immer anzeigen (horizontal gestapelter Balken)
+st.markdown("<div style='margin-top:0.8rem'></div>", unsafe_allow_html=True)
+total_w = sum(gewichte_user.values()) or 1
+segments = "".join(
+    f'<div title="{name}: {pct:.0f}%" style="flex:{pct};background:{DIM_FARBEN[name]};height:8px;opacity:0.85"></div>'
+    for name, pct in gewichte_user.items() if pct > 0
+)
+labels = "&nbsp;&nbsp;".join(
+    f'<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#718096">'
+    f'<span style="width:8px;height:8px;background:{DIM_FARBEN[name]};display:inline-block;border-radius:1px"></span>'
+    f'{name} <b style="color:#2d3748">{pct:.0f}%</b></span>'
+    for name, pct in gewichte_user.items()
+)
+st.markdown(f"""
+<div style="display:flex;border-radius:3px;overflow:hidden;margin-bottom:8px">{segments}</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px 14px;margin-bottom:4px">{labels}</div>
+""", unsafe_allow_html=True)
 
 # Personscore (immer 0–1, normiert)
 gesamt_gewicht = sum(gewichte_user.values()) or 1

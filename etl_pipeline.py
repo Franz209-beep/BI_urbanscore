@@ -517,95 +517,146 @@ def extract_bildung(stadt):
 def extract_gesundheit(stadt):
     """Ärzte, Krankenhäuser, Apotheken via Overpass.
     Normierung: Dichte + Pro-Kopf.
+    Queries erfassen node + way + relation für vollständige Ergebnisse.
     """
     lat       = stadt["lat"]
     lon       = stadt["lon"]
     rad       = stadt["radius_km"] * 1000
     einwohner = stadt["einwohner"]
 
+    # Ärzte: doctors, clinic, health_post – als node UND way
     aerzte = _overpass_count(f"""
     [out:json][timeout:60];
-    (node["amenity"="doctors"](around:{rad},{lat},{lon});
-     node["amenity"="clinic"](around:{rad},{lat},{lon}););
+    (
+      node["amenity"="doctors"](around:{rad},{lat},{lon});
+      way["amenity"="doctors"](around:{rad},{lat},{lon});
+      node["amenity"="clinic"](around:{rad},{lat},{lon});
+      way["amenity"="clinic"](around:{rad},{lat},{lon});
+      node["amenity"="health_post"](around:{rad},{lat},{lon});
+      node["healthcare"="doctor"](around:{rad},{lat},{lon});
+      node["healthcare"="centre"](around:{rad},{lat},{lon});
+      way["healthcare"="centre"](around:{rad},{lat},{lon});
+    );
     out count;
     """)
     time.sleep(5)
+
+    # Krankenhäuser: node + way + relation
     krankenhaeuser = _overpass_count(f"""
     [out:json][timeout:60];
-    (node["amenity"="hospital"](around:{rad},{lat},{lon});
-     way["amenity"="hospital"](around:{rad},{lat},{lon}););
+    (
+      node["amenity"="hospital"](around:{rad},{lat},{lon});
+      way["amenity"="hospital"](around:{rad},{lat},{lon});
+      relation["amenity"="hospital"](around:{rad},{lat},{lon});
+      node["healthcare"="hospital"](around:{rad},{lat},{lon});
+      way["healthcare"="hospital"](around:{rad},{lat},{lon});
+    );
     out count;
     """)
     time.sleep(5)
+
+    # Apotheken: node + way (Filialen oft als way gemappt)
     apotheken = _overpass_count(f"""
     [out:json][timeout:60];
-    (node["amenity"="pharmacy"](around:{rad},{lat},{lon}););
+    (
+      node["amenity"="pharmacy"](around:{rad},{lat},{lon});
+      way["amenity"="pharmacy"](around:{rad},{lat},{lon});
+      node["healthcare"="pharmacy"](around:{rad},{lat},{lon});
+      way["healthcare"="pharmacy"](around:{rad},{lat},{lon});
+    );
     out count;
     """)
 
     gesamt = (aerzte or 0) + (krankenhaeuser or 0) + (apotheken or 0)
-
-    gesundheits_dichte   = _dichte(gesamt, stadt["radius_km"])
-    gesundheit_pro_100k  = _pro_kopf(gesamt, einwohner)
+    gesundheits_dichte  = _dichte(gesamt, stadt["radius_km"])
+    gesundheit_pro_100k = _pro_kopf(gesamt, einwohner)
 
     print(f"  [Gesundheit] {stadt['name']}: {aerzte} Ärzte, {krankenhaeuser} KH, {apotheken} Apotheken "
           f"→ {gesundheits_dichte}/km² | {gesundheit_pro_100k}/100k EW")
     return {
-        "aerzte_anzahl":          aerzte          or 0,
-        "krankenhaeuser_anzahl":  krankenhaeuser  or 0,
-        "apotheken_anzahl":       apotheken       or 0,
-        "gesundheits_dichte":     gesundheits_dichte,
-        "gesundheit_pro_100k":    gesundheit_pro_100k,
+        "aerzte_anzahl":         aerzte         or 0,
+        "krankenhaeuser_anzahl": krankenhaeuser or 0,
+        "apotheken_anzahl":      apotheken      or 0,
+        "gesundheits_dichte":    gesundheits_dichte,
+        "gesundheit_pro_100k":   gesundheit_pro_100k,
     }
 
 
 def extract_freizeit(stadt):
     """Parks, Kultureinrichtungen, Sportstätten via Overpass.
     Normierung: Dichte + Pro-Kopf.
+    Queries erfassen node + way + relation für vollständige Ergebnisse.
     """
     lat       = stadt["lat"]
     lon       = stadt["lon"]
     rad       = stadt["radius_km"] * 1000
     einwohner = stadt["einwohner"]
 
+    # Parks: node + way + relation (Parks sind fast immer ways/relations)
     parks = _overpass_count(f"""
     [out:json][timeout:60];
-    (node["leisure"="park"](around:{rad},{lat},{lon});
-     way["leisure"="park"](around:{rad},{lat},{lon});
-     way["leisure"="nature_reserve"](around:{rad},{lat},{lon}););
+    (
+      node["leisure"="park"](around:{rad},{lat},{lon});
+      way["leisure"="park"](around:{rad},{lat},{lon});
+      relation["leisure"="park"](around:{rad},{lat},{lon});
+      way["leisure"="nature_reserve"](around:{rad},{lat},{lon});
+      relation["leisure"="nature_reserve"](around:{rad},{lat},{lon});
+      way["landuse"="recreation_ground"](around:{rad},{lat},{lon});
+    );
     out count;
     """)
     time.sleep(5)
+
+    # Kultur: node + way + relation (Museen, Theater oft große Gebäude = way)
     kultur = _overpass_count(f"""
     [out:json][timeout:60];
-    (node["amenity"="theatre"](around:{rad},{lat},{lon});
-     node["amenity"="cinema"](around:{rad},{lat},{lon});
-     node["tourism"="museum"](around:{rad},{lat},{lon});
-     node["amenity"="arts_centre"](around:{rad},{lat},{lon}););
+    (
+      node["amenity"="theatre"](around:{rad},{lat},{lon});
+      way["amenity"="theatre"](around:{rad},{lat},{lon});
+      node["amenity"="cinema"](around:{rad},{lat},{lon});
+      way["amenity"="cinema"](around:{rad},{lat},{lon});
+      node["tourism"="museum"](around:{rad},{lat},{lon});
+      way["tourism"="museum"](around:{rad},{lat},{lon});
+      relation["tourism"="museum"](around:{rad},{lat},{lon});
+      node["amenity"="arts_centre"](around:{rad},{lat},{lon});
+      way["amenity"="arts_centre"](around:{rad},{lat},{lon});
+      node["amenity"="concert_hall"](around:{rad},{lat},{lon});
+      way["amenity"="concert_hall"](around:{rad},{lat},{lon});
+      node["tourism"="gallery"](around:{rad},{lat},{lon});
+      way["tourism"="gallery"](around:{rad},{lat},{lon});
+    );
     out count;
     """)
     time.sleep(5)
+
+    # Sport: node + way (Sportplätze fast immer ways)
     sport = _overpass_count(f"""
     [out:json][timeout:60];
-    (node["leisure"="sports_centre"](around:{rad},{lat},{lon});
-     node["leisure"="swimming_pool"](around:{rad},{lat},{lon});
-     way["leisure"="pitch"](around:{rad},{lat},{lon}););
+    (
+      node["leisure"="sports_centre"](around:{rad},{lat},{lon});
+      way["leisure"="sports_centre"](around:{rad},{lat},{lon});
+      node["leisure"="swimming_pool"](around:{rad},{lat},{lon});
+      way["leisure"="swimming_pool"](around:{rad},{lat},{lon});
+      way["leisure"="pitch"](around:{rad},{lat},{lon});
+      way["leisure"="stadium"](around:{rad},{lat},{lon});
+      node["leisure"="fitness_centre"](around:{rad},{lat},{lon});
+      way["leisure"="fitness_centre"](around:{rad},{lat},{lon});
+    );
     out count;
     """)
 
     gesamt = (parks or 0) + (kultur or 0) + (sport or 0)
-
     freizeit_dichte   = _dichte(gesamt, stadt["radius_km"])
     freizeit_pro_100k = _pro_kopf(gesamt, einwohner)
 
     print(f"  [Freizeit] {stadt['name']}: {parks} Parks, {kultur} Kultur, {sport} Sport "
           f"→ {freizeit_dichte}/km² | {freizeit_pro_100k}/100k EW")
     return {
-        "parks_anzahl":       parks   or 0,
-        "kultur_anzahl":      kultur  or 0,
-        "sport_anzahl":       sport   or 0,
-        "freizeit_dichte":    freizeit_dichte,
-        "freizeit_pro_100k":  freizeit_pro_100k,
+        "parks_anzahl":      parks  or 0,
+        "kultur_anzahl":     kultur or 0,
+        "sport_anzahl":      sport  or 0,
+        "freizeit_dichte":   freizeit_dichte,
+        "freizeit_pro_100k": freizeit_pro_100k,
     }
 
 
