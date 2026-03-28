@@ -1,0 +1,39 @@
+name: Täglicher ETL-Lauf
+
+on:
+  schedule:
+    # Jeden Tag um 02:00 UTC (= 03:00 / 04:00 Uhr MEZ/MESZ)
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    # Ermöglicht manuellen Start über die GitHub-Oberfläche
+
+jobs:
+  etl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Abhängigkeiten installieren
+        run: pip install -r requirements.txt
+
+      # API-Keys werden als GitHub Secrets hinterlegt – niemals im Code!
+      - name: ETL-Pipeline ausführen
+        env:
+          GENESIS_USERNAME: ${{ secrets.GENESIS_USERNAME }}
+          GENESIS_PASSWORD: ${{ secrets.GENESIS_PASSWORD }}
+        run: python -m etl.pipeline
+
+      - name: Datenbank committen und pushen
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add urbanscore.db
+          git diff --staged --quiet || git commit -m "ETL: Daten aktualisiert $(date +'%Y-%m-%d')"
+          git push --force origin main

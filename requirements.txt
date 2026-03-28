@@ -2,6 +2,7 @@ requests
 pandas
 scikit-learn
 streamlit>=1.32.0
-overpass
+altair
 plotly
 pydeck
+numpy
