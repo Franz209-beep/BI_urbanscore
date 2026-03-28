@@ -3,3 +3,5 @@ pandas
 scikit-learn
 streamlit>=1.32.0
 overpass
+plotly
+pydeck

@@ -551,51 +551,62 @@ for dim in DIMENSIONEN:
     """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------
-# Korrelationsanalysen
+# Korrelationsanalysen — frei wählbare Achsen
 # ---------------------------------------------------------------
 
 st.markdown('<div class="us-section">Korrelationsanalysen</div>', unsafe_allow_html=True)
 
-KORRELATIONEN = {
-    "Miete vs. Lebensqualität": {
-        "x": "mietpreis_kalt_qm", "y": "gesamtscore",
-        "x_label": "Kaltmiete (€/m²)", "y_label": "Gesamtscore",
-        "beschreibung": "Zahlt man in teureren Städten wirklich für mehr Lebensqualität?",
-        "farbe": "#3B7EC8",
-    },
-    "Arbeitslosigkeit vs. Kriminalität": {
-        "x": "arbeitslosenquote", "y": "straftaten_je_100k",
-        "x_label": "Arbeitslosenquote (%)", "y_label": "Straftaten je 100.000 EW",
-        "beschreibung": "Besteht ein Zusammenhang zwischen wirtschaftlicher Not und Kriminalität?",
-        "farbe": "#B84C2A",
-    },
-    "Infrastruktur vs. Mietpreis": {
-        "x": "poi_dichte", "y": "mietpreis_kalt_qm",
-        "x_label": "POI-Dichte (POIs/km²)", "y_label": "Kaltmiete (€/m²)",
-        "beschreibung": "Treibt bessere Infrastruktur die Mietpreise nach oben?",
-        "farbe": "#C8891F",
-    },
-    "Klima vs. Gesamtscore": {
-        "x": "sonnenstunden_jahr", "y": "gesamtscore",
-        "x_label": "Sonnenstunden / Jahr", "y_label": "Gesamtscore",
-        "beschreibung": "Profitieren sonnige Städte beim Gesamtranking?",
-        "farbe": "#4A9B84",
-    },
+KORR_METRIKEN = {
+    "Gesamtscore":            "gesamtscore",
+    "Personscore":            "personscore",
+    "Kaltmiete (EUR/m2)":    "mietpreis_kalt_qm",
+    "Arbeitslosenquote (%)":  "arbeitslosenquote",
+    "Sonnenstunden/Jahr":     "sonnenstunden_jahr",
+    "Temperatur (C)":         "durchschnittstemperatur",
+    "POI-Dichte":             "poi_dichte",
+    "Straftaten je 100k":     "straftaten_je_100k",
+    "Gewaltdelikte je 100k":  "gewaltdelikte_je_100k",
+    "Bildungsdichte":         "bildungs_dichte",
+    "Bildung je 100k EW":     "bildung_pro_100k",
+    "Gesundheitsdichte":      "gesundheits_dichte",
+    "Gesundheit je 100k EW":  "gesundheit_pro_100k",
+    "Freizeitdichte":         "freizeit_dichte",
+    "Freizeit je 100k EW":    "freizeit_pro_100k",
+    "Score Klima":            "score_klima",
+    "Score Wohnen":           "score_wohnen",
+    "Score Wirtschaft":       "score_wirtschaft",
+    "Score Infrastruktur":    "score_infrastruktur",
+    "Score Bildung":          "score_bildung",
+    "Score Gesundheit":       "score_gesundheit",
+    "Score Freizeit":         "score_freizeit",
+    "Score Sicherheit":       "score_sicherheit",
 }
 
-def pearson(df, x, y):
-    sub = df[[x, y]].dropna()
+verfuegbare_metriken = {
+    label: col for label, col in KORR_METRIKEN.items()
+    if col in df.columns and df[col].notna().any()
+}
+metrik_labels = list(verfuegbare_metriken.keys())
+
+korr_col1, korr_col2 = st.columns(2)
+with korr_col1:
+    x_idx = metrik_labels.index("Kaltmiete (EUR/m2)") if "Kaltmiete (EUR/m2)" in metrik_labels else 0
+    x_label = st.selectbox("X-Achse", metrik_labels, index=x_idx, key="korr_x")
+with korr_col2:
+    y_idx = metrik_labels.index("Gesamtscore") if "Gesamtscore" in metrik_labels else 1
+    y_label = st.selectbox("Y-Achse", metrik_labels, index=y_idx, key="korr_y")
+
+x_col = verfuegbare_metriken[x_label]
+y_col = verfuegbare_metriken[y_label]
+
+def pearson(df_in, x, y):
+    sub = df_in[[x, y]].dropna()
     if len(sub) < 4:
         return None, "Zu wenig Daten"
-    r  = float(np.corrcoef(sub[x], sub[y])[0, 1])
-    st = "stark" if abs(r) >= 0.7 else ("moderat" if abs(r) >= 0.4 else "schwach")
-    ri = "positiv" if r > 0 else "negativ"
-    return round(r, 3), f"{st} {ri}"
-
-kat_auswahl = st.selectbox("Korrelation", list(KORRELATIONEN.keys()),
-                            label_visibility="collapsed")
-kdef  = KORRELATIONEN[kat_auswahl]
-x_col, y_col = kdef["x"], kdef["y"]
+    r     = float(np.corrcoef(sub[x], sub[y])[0, 1])
+    staerke = "stark" if abs(r) >= 0.7 else ("moderat" if abs(r) >= 0.4 else "schwach")
+    richt   = "positiv" if r > 0 else "negativ"
+    return round(r, 3), f"{staerke} {richt}"
 
 col_info, col_chart = st.columns([1, 3])
 with col_info:
@@ -609,23 +620,26 @@ with col_info:
         <div class="us-corr-desc">{interp}</div>
     </div>
     <div class="us-corr-stat">
-        <div class="us-corr-label">Fragestellung</div>
-        <div class="us-corr-desc">{kdef['beschreibung']}</div>
+        <div class="us-corr-label">Achsen</div>
+        <div class="us-corr-desc">
+            <b>X:</b> {x_label}<br/>
+            <b>Y:</b> {y_label}
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
 with col_chart:
-    if x_col in df.columns and y_col in df.columns and df[x_col].notna().any():
+    if x_col != y_col and df[x_col].notna().any() and df[y_col].notna().any():
         sdf = df[["name", x_col, y_col]].dropna()
-        pts = alt.Chart(sdf).mark_circle(size=80, opacity=0.85, color=kdef["farbe"]).encode(
-            x=alt.X(f"{x_col}:Q", title=kdef["x_label"]),
-            y=alt.Y(f"{y_col}:Q", title=kdef["y_label"]),
+        pts = alt.Chart(sdf).mark_circle(size=80, opacity=0.85, color="#3B7EC8").encode(
+            x=alt.X(f"{x_col}:Q", title=x_label),
+            y=alt.Y(f"{y_col}:Q", title=y_label),
             tooltip=["name:N",
-                     alt.Tooltip(f"{x_col}:Q", title=kdef["x_label"], format=".2f"),
-                     alt.Tooltip(f"{y_col}:Q", title=kdef["y_label"], format=".2f")],
+                     alt.Tooltip(f"{x_col}:Q", title=x_label, format=".2f"),
+                     alt.Tooltip(f"{y_col}:Q", title=y_label, format=".2f")],
         )
         trend  = pts.transform_regression(x_col, y_col).mark_line(
-            opacity=0.35, strokeDash=[5, 4], color=kdef["farbe"])
+            opacity=0.35, strokeDash=[5, 4], color="#3B7EC8")
         labels = pts.mark_text(dy=-10, fontSize=9.5, color="#4a5568").encode(text="name:N")
         st.altair_chart(
             (pts + trend + labels).properties(height=300)
@@ -635,58 +649,83 @@ with col_chart:
             use_container_width=True
         )
     else:
-        st.info("Keine ausreichenden Daten.")
+        st.info("Bitte zwei verschiedene Metriken waehlen.")
 
 # ---------------------------------------------------------------
-# Städtevergleich
+# Städtevergleich — Radar-Diagramm (FIFA-Style)
 # ---------------------------------------------------------------
 
-st.markdown('<div class="us-section">Städtevergleich</div>', unsafe_allow_html=True)
+st.markdown('<div class="us-section">Staedtevergleich — Radar</div>', unsafe_allow_html=True)
 
-kategorien = {
-    "Personscore (Profil)":     ("personscore",         False, "#111418"),
-    "Gesamtscore (Standard)":   ("gesamtscore",         False, "#3B7EC8"),
-    "Klima":                    ("score_klima",         False, "#4A9B84"),
-    "Wohnen":                   ("score_wohnen",        False, "#3B7EC8"),
-    "Wirtschaft":               ("score_wirtschaft",    False, "#C8891F"),
-    "Infrastruktur":            ("score_infrastruktur", False, "#B84C2A"),
-    "Bildung":                  ("score_bildung",       False, "#7B52AB"),
-    "Gesundheit":               ("score_gesundheit",    False, "#C0392B"),
-    "Freizeit":                 ("score_freizeit",      False, "#27855A"),
-    "Sicherheit":               ("score_sicherheit",    False, "#2C3E50"),
-    "Mietpreis (€/m²)":        ("mietpreis_kalt_qm",   True,  "#3B7EC8"),
-    "Arbeitslosigkeit (%)":     ("arbeitslosenquote",   True,  "#C8891F"),
-    "Straftaten je 100k":       ("straftaten_je_100k",  True,  "#2C3E50"),
-    "Sonnenstunden (h/Jahr)":   ("sonnenstunden_jahr",  False, "#4A9B84"),
-    "Bildungsdichte (/km²)":    ("bildungs_dichte",     False, "#7B52AB"),
-    "Gesundheitsdichte (/km²)": ("gesundheits_dichte",  False, "#C0392B"),
-    "Freizeitdichte (/km²)":    ("freizeit_dichte",     False, "#27855A"),
-}
+alle_staedte = df_sorted["name"].tolist()
+vergleich_staedte = st.multiselect(
+    "Staedte auswaehlen (2-5)",
+    options=alle_staedte,
+    default=alle_staedte[:3],
+    max_selections=5,
+    key="radar_staedte",
+    label_visibility="collapsed",
+)
 
-kat = st.selectbox("Kennzahl", list(kategorien.keys()), label_visibility="collapsed")
-col_name, invertiert, farbe = kategorien[kat]
-
-if col_name in df_sorted.columns and df_sorted[col_name].notna().any():
-    df_bar = df_sorted[["name", col_name]].dropna().sort_values(col_name, ascending=invertiert)
-    chart = alt.Chart(df_bar).mark_bar(
-        cornerRadiusTopLeft=3, cornerRadiusTopRight=3, color=farbe
-    ).encode(
-        x=alt.X("name:N", sort=None, title=None,
-                axis=alt.Axis(labelAngle=-35, labelFontSize=11, labelColor="#4a5568")),
-        y=alt.Y(f"{col_name}:Q", title=kat,
-                axis=alt.Axis(labelFontSize=10, labelColor="#718096")),
-        opacity=alt.condition(
-            alt.datum["name"] == stadt_auswahl,
-            alt.value(1.0), alt.value(0.45)
-        ),
-        tooltip=["name:N", alt.Tooltip(f"{col_name}:Q", title=kat, format=".2f")],
-    ).properties(height=260).configure_axis(grid=False).configure_view(strokeWidth=0)
-    st.altair_chart(chart, use_container_width=True)
+if len(vergleich_staedte) < 2:
+    st.info("Bitte mindestens 2 Staedte auswaehlen.")
 else:
-    st.info(f"Keine Daten für '{kat}' vorhanden.")
+    RADAR_DIMS = list(SCORE_MAP.keys())
+    RADAR_COLS = list(SCORE_MAP.values())
+    STADT_FARBEN = ["#3B7EC8", "#C0392B", "#27855A", "#C8891F", "#7B52AB"]
+
+    try:
+        import plotly.graph_objects as go
+
+        fig = go.Figure()
+        for i, stadt in enumerate(vergleich_staedte):
+            row_s = df_sorted[df_sorted["name"] == stadt]
+            if row_s.empty:
+                continue
+            werte = [float(row_s.iloc[0].get(col) or 0) * 100 for col in RADAR_COLS]
+            werte_closed = werte + [werte[0]]
+            dims_closed  = RADAR_DIMS + [RADAR_DIMS[0]]
+            farbe = STADT_FARBEN[i % len(STADT_FARBEN)]
+            h = farbe.lstrip("#")
+            rgb = tuple(int(h[j:j+2], 16) for j in (0, 2, 4))
+            fig.add_trace(go.Scatterpolar(
+                r=werte_closed,
+                theta=dims_closed,
+                fill="toself",
+                name=stadt,
+                line=dict(color=farbe, width=2),
+                fillcolor=f"rgba({rgb[0]},{rgb[1]},{rgb[2]},0.12)",
+                hovertemplate="%{theta}: %{r:.1f}<extra>" + stadt + "</extra>",
+            ))
+
+        fig.update_layout(
+            polar=dict(
+                radialaxis=dict(
+                    visible=True, range=[0, 100],
+                    tickfont=dict(size=9, color="#a0aec0"),
+                    gridcolor="#edf2f7", linecolor="#edf2f7",
+                    tickvals=[25, 50, 75, 100],
+                ),
+                angularaxis=dict(
+                    tickfont=dict(size=11, color="#2d3748"),
+                    gridcolor="#edf2f7", linecolor="#edf2f7",
+                ),
+                bgcolor="white",
+            ),
+            showlegend=True,
+            legend=dict(font=dict(size=11, color="#2d3748"),
+                        bgcolor="white", bordercolor="#edf2f7", borderwidth=1),
+            paper_bgcolor="white",
+            margin=dict(t=40, b=40, l=60, r=60),
+            height=450,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    except ImportError:
+        st.warning("Fuer das Radar-Diagramm: `pip install plotly` ausfuehren.")
 
 # ---------------------------------------------------------------
-# Karte — Städte als ausgefüllte Kreisflächen (approximiert)
+# Karte — farbige Kreisflaechen, Umlaute korrekt
 # ---------------------------------------------------------------
 
 st.markdown('<div class="us-section">Karte</div>', unsafe_allow_html=True)
@@ -694,84 +733,62 @@ st.markdown('<div class="us-section">Karte</div>', unsafe_allow_html=True)
 try:
     import pydeck as pdk
 
-    karte_df = df_sorted[["name", "latitude", "longitude", "personscore", "bundesland"]].copy()
+    karte_df = df_sorted[["name", "latitude", "longitude", "personscore"]].copy()
     karte_df = karte_df.rename(columns={"latitude": "lat", "longitude": "lon"})
     karte_df["personscore"] = karte_df["personscore"].fillna(0)
 
-    # Farbe: Grün (hoch) → Rot (niedrig) basierend auf Personscore
     def score_to_rgb(s):
         s = max(0.0, min(1.0, float(s)))
         r = int((1 - s) * 200 + 30)
         g = int(s * 180 + 40)
-        b = 80
-        return [r, g, b, 160]
+        return [r, g, 80, 160]
 
     karte_df["fill_color"] = karte_df["personscore"].apply(score_to_rgb)
-
-    # Radius proportional zum Score, Basisradius ~8km
-    karte_df["radius"] = karte_df["personscore"].apply(lambda s: int(6000 + float(s) * 8000))
-
-    layer = pdk.Layer(
-        "ScatterplotLayer",
-        data=karte_df,
-        get_position=["lon", "lat"],
-        get_fill_color="fill_color",
-        get_radius="radius",
-        pickable=True,
-        stroked=True,
-        get_line_color=[255, 255, 255, 80],
-        line_width_min_pixels=1,
+    karte_df["radius"]     = karte_df["personscore"].apply(lambda s: int(6000 + float(s) * 8000))
+    # Umlaute ersetzen — pydeck TextLayer hat Probleme mit UTF-8-Sonderzeichen
+    karte_df["label"] = (karte_df["name"]
+        .str.replace("ue", "ue").str.replace("oe", "oe")   # bereits ASCII
+        .str.replace("\u00fc", "ue").str.replace("\u00f6", "oe").str.replace("\u00e4", "ae")
+        .str.replace("\u00dc", "Ue").str.replace("\u00d6", "Oe").str.replace("\u00c4", "Ae")
+        .str.replace("\u00df", "ss")
     )
 
-    text_layer = pdk.Layer(
-        "TextLayer",
-        data=karte_df,
-        get_position=["lon", "lat"],
-        get_text="name",
-        get_size=12,
-        get_color=[30, 30, 30, 220],
-        get_alignment_baseline="'bottom'",
-    )
-
-    view = pdk.ViewState(latitude=51.2, longitude=10.4, zoom=5.2, pitch=0)
-
-    tooltip = {
-        "html": "<b>{name}</b><br/>Score: {personscore:.2f}",
-        "style": {"background": "white", "color": "#111418",
-                  "font-family": "'DM Sans', sans-serif", "font-size": "12px",
-                  "padding": "8px 12px", "border-radius": "4px"},
-    }
+    layer = pdk.Layer("ScatterplotLayer", data=karte_df,
+        get_position=["lon", "lat"], get_fill_color="fill_color",
+        get_radius="radius", pickable=True, stroked=True,
+        get_line_color=[255, 255, 255, 80], line_width_min_pixels=1)
+    text_layer = pdk.Layer("TextLayer", data=karte_df,
+        get_position=["lon", "lat"], get_text="label",
+        get_size=12, get_color=[30, 30, 30, 220],
+        get_alignment_baseline="'bottom'")
 
     st.pydeck_chart(pdk.Deck(
         layers=[layer, text_layer],
-        initial_view_state=view,
-        tooltip=tooltip,
+        initial_view_state=pdk.ViewState(latitude=51.2, longitude=10.4, zoom=5.2),
+        tooltip={"html": "<b>{name}</b><br/>Score: {personscore:.2f}",
+                 "style": {"background": "white", "color": "#111418",
+                           "font-size": "12px", "padding": "8px 12px"}},
         map_style="light",
     ))
-
-    # Legende
     st.markdown("""
-    <div style="display:flex;align-items:center;gap:16px;margin-top:6px;font-size:0.72rem;color:#718096">
+    <div style="display:flex;align-items:center;gap:14px;margin-top:6px;font-size:0.72rem;color:#718096">
         <span>Score niedrig</span>
         <div style="display:flex;gap:3px">
-            <div style="width:16px;height:10px;background:rgb(230,40,80);border-radius:2px;opacity:0.8"></div>
-            <div style="width:16px;height:10px;background:rgb(200,100,80);border-radius:2px;opacity:0.8"></div>
-            <div style="width:16px;height:10px;background:rgb(160,150,80);border-radius:2px;opacity:0.8"></div>
-            <div style="width:16px;height:10px;background:rgb(80,180,80);border-radius:2px;opacity:0.8"></div>
-            <div style="width:16px;height:10px;background:rgb(40,220,120);border-radius:2px;opacity:0.8"></div>
+            <div style="width:14px;height:8px;background:rgb(230,40,80);border-radius:2px"></div>
+            <div style="width:14px;height:8px;background:rgb(190,110,80);border-radius:2px"></div>
+            <div style="width:14px;height:8px;background:rgb(140,150,80);border-radius:2px"></div>
+            <div style="width:14px;height:8px;background:rgb(70,185,80);border-radius:2px"></div>
+            <div style="width:14px;height:8px;background:rgb(30,220,100);border-radius:2px"></div>
         </div>
-        <span>Score hoch</span>
-        <span style="margin-left:12px;color:#a0aec0">Kreisradius proportional zum Score</span>
+        <span>Score hoch &nbsp;·&nbsp; Radius proportional zum Score</span>
     </div>
     """, unsafe_allow_html=True)
 
 except ImportError:
-    # Fallback: Standard st.map
     karte_df = df_sorted[["name", "latitude", "longitude", "personscore"]].copy()
     karte_df = karte_df.rename(columns={"latitude": "lat", "longitude": "lon"})
     karte_df["personscore"] = karte_df["personscore"].fillna(0)
     st.map(karte_df, latitude="lat", longitude="lon", size=40000, zoom=5)
-    st.caption("Für die farbige Karte: `pip install pydeck` ausführen.")
 
 # ---------------------------------------------------------------
 # Zeitreihe
