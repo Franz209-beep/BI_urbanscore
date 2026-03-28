@@ -10,6 +10,11 @@ charts.py (Visualisierungen) gekapselt.
 
 import datetime
 import os
+import sys
+
+# Stellt sicher, dass das Projekt-Root (wo config.py liegt) im Python-Pfad ist.
+# Nötig wenn app.py aus einem Unterordner heraus gestartet wird (z.B. Streamlit Cloud).
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 import streamlit as st
