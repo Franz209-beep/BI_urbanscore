@@ -105,6 +105,10 @@ ARBEITSMARKT_STATISCH = {
     "Münster":     {"arbeitslosenquote":  5.1, "offene_stellen": None},
 }
 
+# AGS-Schlüssel (8-stellig) → wird für BA-API benötigt
+# Die API erwartet den Regionalschlüssel auf Gemeindeebene
+AGS_MAP = {s["name"]: s["ags"] for s in STAEDTE}
+
 # Quelle: BKA PKS 2023, Straftaten je 100.000 Einwohner
 KRIMINALITAET_STATISCH = {
     "Berlin":      {"straftaten_je_100k": 15823, "gewaltdelikte_je_100k": 384},
@@ -372,7 +376,78 @@ def extract_miete(stadt):
     return MIETPREISE_STATISCH.get(stadt["name"])
 
 def extract_arbeitsmarkt(stadt):
-    return ARBEITSMARKT_STATISCH.get(stadt["name"])
+    """
+    Arbeitslosenquote dynamisch von der Bundesagentur für Arbeit API.
+    Endpoint: Statistik-API der BA (inoffiziell, stabil seit Jahren)
+    Regionalisierung über AGS (Amtlicher Gemeindeschlüssel, 8-stellig).
+    Fallback: statische Daten falls API nicht erreichbar.
+    """
+    ags  = AGS_MAP.get(stadt["name"])
+    name = stadt["name"]
+
+    if ags:
+        try:
+            # BA Statistik-API: Arbeitsmarktdaten nach Gemeinde
+            # Datei: "alo" = Arbeitslosigkeit, Region via "gebiete" Parameter
+            url = "https://statistik.arbeitsagentur.de/api/Veroeff/SuGroupCodes"
+            params = {
+                "region":  ags,
+                "zr":      "Monat",           # Monatsauflösung
+                "leistung":"Alo",             # Arbeitslosigkeit
+                "dat":     "Eckwerte",
+            }
+            headers = {"User-Agent": "UrbanScore-ETL/1.0"}
+            resp = requests.get(url, params=params, headers=headers, timeout=20)
+            resp.raise_for_status()
+            data = resp.json()
+
+            # Quote aus Antwort extrahieren
+            quote = None
+            for eintrag in data.get("eintraege", []):
+                if "arbeitslosenquote" in str(eintrag.get("bezeichnung", "")).lower():
+                    wert = eintrag.get("wert")
+                    if wert is not None:
+                        quote = round(float(str(wert).replace(",", ".")), 1)
+                        break
+
+            if quote is not None:
+                print(f"  [Arbeitsmarkt] {name}: {quote}% (BA-API)")
+                return {"arbeitslosenquote": quote, "offene_stellen": None}
+            else:
+                print(f"  [Arbeitsmarkt] {name}: Quote nicht in API-Antwort, versuche Fallback-Endpoint")
+
+        except Exception as e:
+            print(f"  [Arbeitsmarkt] {name}: API-Fehler ({e}), versuche Fallback-Endpoint")
+
+        # Fallback-Endpoint: Direkte Tabellen-CSV der BA (öffentlich)
+        try:
+            # Jahreswert für das aktuelle oder letzte Jahr
+            jahr = JAHR - 1
+            csv_url = (
+                f"https://statistik.arbeitsagentur.de/SiteGlobals/Forms/Rubrikensuche/"
+                f"Rubrikensuche_Form.html?view=processForm&resourceId=210358&input_="
+                f"&pageLocale=de&topicId=746694&region={ags}&year={jahr}&admtype=gem"
+            )
+            resp2 = requests.get(csv_url, timeout=20,
+                                 headers={"User-Agent": "UrbanScore-ETL/1.0"})
+            # Wenn das auch fehlschlägt → statischer Fallback
+            resp2.raise_for_status()
+            # Versuche Quote aus Antwort zu lesen (Format variiert)
+            text = resp2.text
+            import re
+            matches = re.findall(r'(\d+[,.]\d+)\s*%', text)
+            if matches:
+                quote = round(float(matches[0].replace(",", ".")), 1)
+                print(f"  [Arbeitsmarkt] {name}: {quote}% (BA-CSV-Fallback)")
+                return {"arbeitslosenquote": quote, "offene_stellen": None}
+        except Exception:
+            pass
+
+    # Letzter Fallback: statische Daten mit Hinweis
+    fallback = ARBEITSMARKT_STATISCH.get(name)
+    if fallback:
+        print(f"  [Arbeitsmarkt] {name}: {fallback['arbeitslosenquote']}% (statisch, BKA 2023)")
+    return fallback
 
 def extract_sicherheit(stadt):
     daten = KRIMINALITAET_STATISCH.get(stadt["name"])

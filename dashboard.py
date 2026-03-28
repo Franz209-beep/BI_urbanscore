@@ -602,15 +602,29 @@ y_col = verfuegbare_metriken[y_label]
 def pearson(df_in, x, y):
     sub = df_in[[x, y]].dropna()
     if len(sub) < 4:
-        return None, "Zu wenig Daten"
-    r     = float(np.corrcoef(sub[x], sub[y])[0, 1])
+        return None, "Zu wenig Daten", ""
+    r       = float(np.corrcoef(sub[x], sub[y])[0, 1])
     staerke = "stark" if abs(r) >= 0.7 else ("moderat" if abs(r) >= 0.4 else "schwach")
     richt   = "positiv" if r > 0 else "negativ"
-    return round(r, 3), f"{staerke} {richt}"
+    kurzform = f"{staerke} {richt}"
+
+    # Einzeiler-Interpretation
+    if abs(r) >= 0.7 and r > 0:
+        satz = f"Starker positiver Zusammenhang: Steigt {x_label}, steigt tendenziell auch {y_label}."
+    elif abs(r) >= 0.7 and r < 0:
+        satz = f"Starker negativer Zusammenhang: Steigt {x_label}, sinkt tendenziell {y_label}."
+    elif abs(r) >= 0.4 and r > 0:
+        satz = f"Moderater positiver Trend erkennbar, aber mit deutlicher Streuung."
+    elif abs(r) >= 0.4 and r < 0:
+        satz = f"Moderater negativer Trend erkennbar, aber mit deutlicher Streuung."
+    else:
+        satz = f"Kein klarer linearer Zusammenhang zwischen den beiden Variablen."
+
+    return round(r, 3), kurzform, satz
 
 col_info, col_chart = st.columns([1, 3])
 with col_info:
-    r_val, interp = pearson(df, x_col, y_col)
+    r_val, interp, satz = pearson(df, x_col, y_col)
     r_txt   = f"{r_val:+.3f}" if r_val is not None else "—"
     r_color = "#111418" if r_val is None else ("#276749" if abs(r_val) >= 0.5 else "#744210")
     st.markdown(f"""
@@ -618,6 +632,10 @@ with col_info:
         <div class="us-corr-label">Pearson r</div>
         <div class="us-corr-val" style="color:{r_color}">{r_txt}</div>
         <div class="us-corr-desc">{interp}</div>
+    </div>
+    <div class="us-corr-stat">
+        <div class="us-corr-label">Interpretation</div>
+        <div class="us-corr-desc">{satz}</div>
     </div>
     <div class="us-corr-stat">
         <div class="us-corr-label">Achsen</div>
