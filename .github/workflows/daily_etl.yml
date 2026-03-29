@@ -32,7 +32,7 @@ jobs:
         env:
           GENESIS_USERNAME: ${{ secrets.GENESIS_USERNAME }}
           GENESIS_PASSWORD: ${{ secrets.GENESIS_PASSWORD }}
-        run: python etl_pipeline.py
+        run: python -m etl.pipeline
         
       # 5. Aktualisierte Datenbank zurück ins Repository pushen
       - name: Datenbank committen und pushen
