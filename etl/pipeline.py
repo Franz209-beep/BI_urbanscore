@@ -60,7 +60,8 @@ OVERPASS_PAUSE_S = 10
 
 def main() -> None:
     heute         = date.today()
-    overpass_tag  = heute.weekday() == 0  # Montag = reguläres Overpass-Update
+    # overpass_tag  = heute.weekday() == 0  # Montag = reguläres Overpass-Update
+    overpass_tag = False
 
     print(f"=== UrbanScore ETL-Pipeline ({heute}) ===")
     print(f"    Städte: {len(config.STAEDTE)} | "
